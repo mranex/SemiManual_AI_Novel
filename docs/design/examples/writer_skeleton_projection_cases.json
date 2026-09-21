@@ -1,0 +1,197 @@
+{
+  "description": "Hai ca biên soạn đối chiếu trực tiếp section trong Skeleton v1; source_section chỉ dành cho kiểm tra, không gửi Writer. ID tmp_section_1 được giả định backend map thành section_0003 trước accept.",
+  "cases": [
+    {
+      "case_id": "writer_skeleton_hint",
+      "prompt_id": "writer.v1",
+      "source_section": {
+        "section_id": "section_0002",
+        "index": 2,
+        "type": "foreshadow",
+        "instruction": "Sau khi tỉnh lại, cho Sở Dương kiểm tra cái nồi cạnh tay. Anh cọ thử lớp rỉ xốp rồi gõ một hòn đá vào thành nồi; đá chạm rõ nhưng thành nồi không móp. Chỉ cho thấy anh ngạc nhiên và kiểm tra lại, kết khi anh vẫn chưa hiểu vì sao.",
+        "purpose": "Gieo dấu hiệu về nguồn gốc kín của vật phẩm mà chưa xác nhận lời giải.",
+        "purpose_visibility": "planner_only",
+        "writer_notes": [
+          "Giữ quan sát trong POV Sở Dương; anh có thể so sánh với vật liệu quen thuộc nhưng không kết luận cơ chế.",
+          "Cho phép chọn nhịp thao tác và cảm giác bàn tay; không cần đoạn giảng giải về luyện khí."
+        ],
+        "author_only_notes": [
+          "Truth nội bộ: cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người; chi tiết này không được gửi Writer."
+        ],
+        "required_beats": [
+          "Lớp rỉ xốp trên bề mặt",
+          "Gõ bằng đá nhưng thành nồi không móp",
+          "Sở Dương kiểm tra lại mà chưa có lời giải"
+        ],
+        "forbidden_moves": [
+          "Không giải thích nguồn gốc hoặc cơ chế của cái nồi.",
+          "Không cho cái nồi nói chuyện hoặc bộc lộ năng lực mới.",
+          "Không chuyển sang góc nhìn biết sẵn đáp án."
+        ],
+        "character_ids": [
+          "char_0001"
+        ],
+        "world_rule_ids": [],
+        "foreshadow_ids": [
+          "fs_0001"
+        ],
+        "foreshadow_surfaces": [
+          {
+            "foreshadow_id": "fs_0001",
+            "surface_instruction": "Cho thấy bề mặt rỉ xốp nhưng thành nồi không móp khi gõ đá; giữ hiện tượng chưa giải thích.",
+            "reveal_policy": "hint_only"
+          }
+        ]
+      },
+      "request": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 1,
+        "title": "Thành nồi",
+        "base_idea_constraints": [],
+        "premise_constraints": [],
+        "skeleton": {
+          "sections": [
+            {
+              "section_id": "section_0002",
+              "instruction": "Sau khi tỉnh lại, cho Sở Dương kiểm tra cái nồi cạnh tay. Anh cọ thử lớp rỉ xốp rồi gõ một hòn đá vào thành nồi; đá chạm rõ nhưng thành nồi không móp. Chỉ cho thấy anh ngạc nhiên và kiểm tra lại, kết khi anh vẫn chưa hiểu vì sao.",
+              "writer_notes": [
+                "Giữ quan sát trong POV Sở Dương; anh có thể so sánh với vật liệu quen thuộc nhưng không kết luận cơ chế.",
+                "Cho phép chọn nhịp thao tác và cảm giác bàn tay; không cần đoạn giảng giải về luyện khí."
+              ],
+              "required_beats": [
+                "Lớp rỉ xốp trên bề mặt",
+                "Gõ bằng đá nhưng thành nồi không móp",
+                "Sở Dương kiểm tra lại mà chưa có lời giải"
+              ],
+              "forbidden_moves": [
+                "Không giải thích nguồn gốc hoặc cơ chế của cái nồi.",
+                "Không cho cái nồi nói chuyện hoặc bộc lộ năng lực mới.",
+                "Không chuyển sang góc nhìn biết sẵn đáp án."
+              ],
+              "foreshadow_surfaces": [
+                "Cho thấy bề mặt rỉ xốp nhưng thành nồi không móp khi gõ đá; giữ hiện tượng chưa giải thích."
+              ]
+            }
+          ],
+          "global_constraints": [
+            "Ngôn ngữ: tiếng Việt.",
+            "POV: ngôi ba giới hạn theo nhân vật chính.",
+            "Độ dài: khoảng 80–150 từ cho cảnh minh họa."
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Sở Dương",
+            "public_profile": {
+              "traits": [
+                "Chú ý những bất thường trước mắt."
+              ]
+            },
+            "writer_profile": {}
+          }
+        ],
+        "world_rules": [],
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "previous_final_summary": null,
+        "style": "# Văn phong mặc định v1\n\nHướng dẫn thể hiện cho Writer/Rewrite; Review có thể đối chiếu. Nhường yêu cầu tác giả và mọi constraint accepted. Không thay Skeleton, thiết kế plot, thêm manh mối hoặc ép thể loại.\n\n- Dùng động từ rõ chủ thể, chi tiết cảm giác được POV nhận biết. Chọn chi tiết phục vụ cảnh, không liệt kê giác quan theo công thức.\n- Giọng thoại theo profile, vị thế và mục đích của từng người. Cho lời đáp có phản ứng, khoảng lặng khi có ý nghĩa; không bắt mọi câu đều cụt hoặc mọi người đều né tránh.\n- Cảnh quan trọng có hành động và phản ứng đủ sức nặng; chuyển cảnh gọn nhưng không bỏ mất nguyên nhân. Nhịp câu theo nhịp cảnh, không áp tỷ lệ câu dài/ngắn.\n- Tránh hình ảnh sáo, cấu trúc đối xứng và lời bình chủ đề lặp. Có thể kể trực tiếp để nối thời gian; không biến “thể hiện” thành cấm tuyệt đối mọi câu gọi tên cảm xúc.\n- Giữ định dạng thoại nhất quán, đổi đoạn khi đổi người nói. Không biến section Skeleton thành danh sách hay đề mục kỹ thuật trong truyện.\n- Kết ở tình thế Skeleton yêu cầu. Không cần ép câu triết lý, cliffhanger hoặc một bí ẩn mới vào cuối mỗi chương.\n\nKhông có nguồn bổ sung phải đọc hoặc trạng thái phải tự lưu. Đây là guidance ngôn ngữ, không phải bộ kiểm tra tự động hay điều kiện finalize.\n",
+        "user_instruction": "Triển khai đúng section thành cảnh mẫu; không thêm sự kiện ngoài chỉ dẫn."
+      },
+      "response": "Sở Dương chống tay ngồi dậy. Cái nồi nằm ngay bên cạnh; anh kéo nó tới, cọ ngón cái lên lớp rỉ. Một mảng xốp vụn ra, để lại vệt nâu trên da.\n\nAnh nhặt hòn đá dưới chân, gõ vào thành nồi. Tiếng chạm bật lên khô và rõ. Sở Dương cúi nhìn chỗ vừa gõ, đưa ngón tay miết thử. Mặt nồi vẫn phẳng.\n\nAnh xoay nó về phía sáng, tìm một vết lõm khác mà mình có thể đã nhìn nhầm. Không có. Hòn đá còn trong tay, anh đưa mắt từ nó sang thành nồi, rồi cọ thử lớp rỉ lần nữa."
+    },
+    {
+      "case_id": "writer_skeleton_partial_reveal",
+      "prompt_id": "writer.v1",
+      "source_section": {
+        "section_id": "tmp_section_1",
+        "index": 1,
+        "type": "reveal",
+        "instruction": "Cho nhân vật đối chiếu mép dấu niêm với đường gấp trên lá thư. Thể hiện dấu niêm đã bị bóc rồi dán lại; nhân vật kết luận thư từng bị mở, nhưng chưa xác định ai đã làm hoặc vì sao.",
+        "purpose": "Trả lời câu hỏi thư có nguyên vẹn không, giữ kín người can thiệp.",
+        "purpose_visibility": "planner_only",
+        "writer_notes": [
+          "Chỉ dựa vào dấu vết được mô tả, không chuyển sang góc nhìn người đã mở thư."
+        ],
+        "author_only_notes": [
+          "Trong ví dụ này người mở thư là người đưa tin nhằm che việc đổi lịch hẹn; phần đó chưa được phép reveal."
+        ],
+        "required_beats": [
+          "Đối chiếu dấu niêm",
+          "Xác nhận thư đã bị mở",
+          "Chưa xác định thủ phạm hoặc động cơ"
+        ],
+        "forbidden_moves": [
+          "Không xác định danh tính hay động cơ người can thiệp."
+        ],
+        "character_ids": [
+          "char_0001"
+        ],
+        "world_rule_ids": [],
+        "foreshadow_ids": [
+          "fs_0002"
+        ],
+        "foreshadow_surfaces": [
+          {
+            "foreshadow_id": "fs_0002",
+            "surface_instruction": "Dấu niêm bị bóc rồi dán lại xác nhận thư từng bị mở; không tiết lộ ai làm hoặc mục đích.",
+            "reveal_policy": "partial_reveal"
+          }
+        ]
+      },
+      "request": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 1,
+        "title": "Dấu niêm",
+        "base_idea_constraints": [],
+        "premise_constraints": [],
+        "skeleton": {
+          "sections": [
+            {
+              "section_id": "section_0003",
+              "instruction": "Cho nhân vật đối chiếu mép dấu niêm với đường gấp trên lá thư. Thể hiện dấu niêm đã bị bóc rồi dán lại; nhân vật kết luận thư từng bị mở, nhưng chưa xác định ai đã làm hoặc vì sao.",
+              "writer_notes": [
+                "Chỉ dựa vào dấu vết được mô tả, không chuyển sang góc nhìn người đã mở thư."
+              ],
+              "required_beats": [
+                "Đối chiếu dấu niêm",
+                "Xác nhận thư đã bị mở",
+                "Chưa xác định thủ phạm hoặc động cơ"
+              ],
+              "forbidden_moves": [
+                "Không xác định danh tính hay động cơ người can thiệp."
+              ],
+              "foreshadow_surfaces": [
+                "Dấu niêm bị bóc rồi dán lại xác nhận thư từng bị mở; không tiết lộ ai làm hoặc mục đích."
+              ]
+            }
+          ],
+          "global_constraints": [
+            "Ngôn ngữ: tiếng Việt.",
+            "POV: ngôi ba giới hạn theo nhân vật chính.",
+            "Độ dài: khoảng 80–150 từ cho cảnh minh họa."
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "public_profile": {
+              "traits": [
+                "Chú ý những bất thường trước mắt."
+              ]
+            },
+            "writer_profile": {}
+          }
+        ],
+        "world_rules": [],
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "previous_final_summary": null,
+        "style": "# Văn phong mặc định v1\n\nHướng dẫn thể hiện cho Writer/Rewrite; Review có thể đối chiếu. Nhường yêu cầu tác giả và mọi constraint accepted. Không thay Skeleton, thiết kế plot, thêm manh mối hoặc ép thể loại.\n\n- Dùng động từ rõ chủ thể, chi tiết cảm giác được POV nhận biết. Chọn chi tiết phục vụ cảnh, không liệt kê giác quan theo công thức.\n- Giọng thoại theo profile, vị thế và mục đích của từng người. Cho lời đáp có phản ứng, khoảng lặng khi có ý nghĩa; không bắt mọi câu đều cụt hoặc mọi người đều né tránh.\n- Cảnh quan trọng có hành động và phản ứng đủ sức nặng; chuyển cảnh gọn nhưng không bỏ mất nguyên nhân. Nhịp câu theo nhịp cảnh, không áp tỷ lệ câu dài/ngắn.\n- Tránh hình ảnh sáo, cấu trúc đối xứng và lời bình chủ đề lặp. Có thể kể trực tiếp để nối thời gian; không biến “thể hiện” thành cấm tuyệt đối mọi câu gọi tên cảm xúc.\n- Giữ định dạng thoại nhất quán, đổi đoạn khi đổi người nói. Không biến section Skeleton thành danh sách hay đề mục kỹ thuật trong truyện.\n- Kết ở tình thế Skeleton yêu cầu. Không cần ép câu triết lý, cliffhanger hoặc một bí ẩn mới vào cuối mỗi chương.\n\nKhông có nguồn bổ sung phải đọc hoặc trạng thái phải tự lưu. Đây là guidance ngôn ngữ, không phải bộ kiểm tra tự động hay điều kiện finalize.\n",
+        "user_instruction": "Triển khai đúng section thành cảnh mẫu; không thêm sự kiện ngoài chỉ dẫn."
+      },
+      "response": "An giữ lá thư sát đèn. Mép dấu niêm không trùng với đường gấp: một vệt keo cũ lộ ra bên dưới lớp dán mới. Cô nghiêng tờ giấy, lần mắt theo chỗ mép niêm bị kéo lệch.\n\nThư đã bị mở, rồi dán lại. An đặt nó xuống bàn, giữ đầu ngón tay trên mép giấy. Cô nhìn cánh cửa một lúc, nhưng chẳng có gì ở đó giúp cô biết ai đã chạm vào lá thư, hoặc họ muốn gì."
+    }
+  ]
+}

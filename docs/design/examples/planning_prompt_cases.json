@@ -1,0 +1,2149 @@
+{
+  "schema_version": 1,
+  "description": "Ca biên soạn thủ công T05, không phải output LLM hoặc project accepted. Ch1 là thiết kế trước khi có final; ch2 giả định rolling_adjust đã được user accept rồi mới tạo Skeleton. T02 chỉ có hai section Skeleton ch1 minh họa, T05 bổ sung đủ beats trong fixture riêng. planned_payoff arc_0003 ngoài range chưa resolve được nên projection input để null; không sửa foundation gốc.",
+  "cases": [
+    {
+      "case_id": "long_plan",
+      "prompt_id": "long_plan.v1",
+      "request": {
+        "action": "generate",
+        "language": "vi",
+        "genre_prompt": "Tu tiên hài nhẹ; tôn trọng Base Idea, không ép motif.",
+        "base_idea_markdown": "# Base Idea accepted\n\nMột bác sĩ cấp cứu người Việt chết khi quay lại cứu một nạn nhân trên đường vắng. Anh tỉnh dậy trong một thân xác lạ trên sườn núi, chỉ còn cái nồi sắt đen và một giọng nói máy móc ép thân thể đi thu thập nguyên liệu.\n\nTruyện giữ giọng phiêu lưu hài nhẹ nhưng không phá sự nguy hiểm cụ thể của từng cảnh. Nhân vật chính có thể mỉa mai và sợ hãi, nhưng không được mất phản xạ cứu người.\n\nRàng buộc:\n\n- Không để Writer tự giải thích nguồn gốc cái nồi.\n- Không reveal secret của foreshadow trước khi Skeleton surface.\n- Không dùng tên nhân vật làm khóa liên kết.\n\n",
+        "premise": {
+          "title": "Nồi Canh Bên Đường",
+          "logline": "Sở Dương, một bác sĩ cấp cứu, tỉnh dậy ở Thương Ngô giới với cái nồi sắt đen và một hệ thống không biết thương lượng.",
+          "dramatic_question": "Anh có giữ được nguyên tắc cứu người khi chính thân thể mình không còn hoàn toàn nghe lời không?",
+          "themes": [
+            "quyền lựa chọn",
+            "phản xạ nghề nghiệp",
+            "lòng tốt không màu mè"
+          ],
+          "tone_contract": [
+            "Tiếng Việt tự nhiên.",
+            "Hài nhẹ đến từ phản ứng của nhân vật, không phá hiểm nguy."
+          ],
+          "hard_constraints": [
+            "Không reveal nguồn gốc cái nồi trong chương 1.",
+            "Không để Writer tự tạo major twist."
+          ],
+          "non_goals": [
+            "Không xây hệ thống agent trong app."
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Sở Dương",
+            "aliases": [
+              "Sở Đại Phu"
+            ],
+            "role": "protagonist",
+            "tier": "core",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Bác sĩ cấp cứu thời hiện đại, tỉnh dậy trong thân xác lạ.",
+              "traits": [
+                "điềm tĩnh khi khám bệnh",
+                "miệng tiện",
+                "cố chấp cứu người"
+              ],
+              "voice": "Mỉa mai ngắn, ưu tiên quan sát cụ thể.",
+              "known_history": "Chết trên đường vắng khi quay lại cứu người bị tai nạn."
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Giữ phản xạ kiểm tra triệu chứng và môi trường.",
+                "Có thể sợ nhưng không được suy diễn chắc chắn về thế giới mới."
+              ]
+            },
+            "author_only": {
+              "secret": "Thân xác nguyên chủ từng liên quan tới bí mật của cái nồi, chưa reveal."
+            },
+            "future_direction": {
+              "arc_0001": "Từ chỉ muốn sống qua đêm đầu sang chủ động cứu người trước mặt."
+            }
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Tiêu Như Ngọc",
+            "aliases": [],
+            "role": "ally_future",
+            "tier": "major",
+            "effective_from_chapter": 2,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Người giữ ánh lửa xa dưới thung lũng, sẽ xuất hiện trực tiếp từ chương 2.",
+              "traits": [
+                "thận trọng",
+                "giỏi quan sát"
+              ],
+              "voice": "Ít lời, hỏi thẳng.",
+              "known_history": ""
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Không xuất hiện trực tiếp trong chương 1."
+              ]
+            },
+            "author_only": {},
+            "future_direction": {
+              "arc_0001": "Từ nghi ngờ Sở Dương sang buộc phải hợp tác."
+            }
+          }
+        ],
+        "world_rules": [
+          {
+            "world_rule_id": "rule_0001",
+            "category": "Hệ thống",
+            "summary": "Giọng nói hệ thống chỉ phát câu lệnh cứng nhắc.",
+            "content": "Trong chương đầu, hệ thống chỉ có ba câu: chào ký chủ, thiếu nguyên liệu, bắt đầu thu thập nguyên liệu.",
+            "boundary": "Hệ thống không thương lượng, không giải thích, không bông đùa.",
+            "effective_from_chapter": 1,
+            "visibility": "writer_safe",
+            "writer_projection": "Hệ thống nói ngắn, lặp máy móc, không đối đáp.",
+            "author_only": {}
+          }
+        ],
+        "foreshadows": [
+          {
+            "foreshadow_id": "fs_0001",
+            "label": "Nguồn gốc cái nồi",
+            "truth_author_only": "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ.",
+            "planned_planting": [
+              {
+                "chapter_id": "ch_0001",
+                "surface_instruction": "Mô tả nồi rỉ xốp nhưng không móp khi gõ đá; không giải thích nguyên nhân.",
+                "visibility": "skeleton_only"
+              }
+            ],
+            "planned_payoff": null,
+            "effective_from_chapter": 1,
+            "writer_visibility": "skeleton_only",
+            "status": "active"
+          }
+        ],
+        "relationships_as_of": [],
+        "planning_scope": {
+          "start": 1,
+          "end": 7
+        },
+        "assigned_volume_ids": [
+          "vol_0001"
+        ],
+        "assigned_arc_ids": [
+          "arc_0001",
+          "arc_0002"
+        ],
+        "previous_long_plan": null,
+        "user_instruction": "Lập volume/arc đêm đầu từ chương 1 đến 7."
+      },
+      "response": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Nồi Canh Bên Đường",
+            "theme": "Giữ quyền lựa chọn khi bị kéo vào một luật chơi lạ.",
+            "goal": "Đưa Sở Dương sống qua đêm đầu và hiểu giới hạn của hệ thống.",
+            "arcs": [
+              {
+                "arc_id": "arc_0001",
+                "title": "Đêm đầu trên Vạn Linh sơn",
+                "chapter_range": {
+                  "start": 1,
+                  "end": 7
+                },
+                "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+                "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+                "start_state": "Tỉnh dậy đơn độc.",
+                "end_state": "Hiểu một phần luật cưỡng chế và có đồng minh miễn cưỡng.",
+                "major_reveals": [
+                  "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+                ],
+                "character_ids": [
+                  "char_0001",
+                  "char_0002"
+                ],
+                "world_rule_ids": [
+                  "rule_0001"
+                ],
+                "foreshadow_ids": [
+                  "fs_0001"
+                ],
+                "relationship_directions": [
+                  {
+                    "character_ids": [
+                      "char_0001",
+                      "char_0002"
+                    ],
+                    "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+                    "target_state": "Miễn cưỡng tin nhau",
+                    "notes": "Đây là plan tương lai, không phải current relationship."
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "global_threads": [
+          {
+            "label": "Nguồn gốc cái nồi",
+            "foreshadow_id": "fs_0001"
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "short_plan",
+      "prompt_id": "short_plan.v1",
+      "request": {
+        "action": "generate",
+        "language": "vi",
+        "base_idea_markdown": "# Base Idea accepted\n\nMột bác sĩ cấp cứu người Việt chết khi quay lại cứu một nạn nhân trên đường vắng. Anh tỉnh dậy trong một thân xác lạ trên sườn núi, chỉ còn cái nồi sắt đen và một giọng nói máy móc ép thân thể đi thu thập nguyên liệu.\n\nTruyện giữ giọng phiêu lưu hài nhẹ nhưng không phá sự nguy hiểm cụ thể của từng cảnh. Nhân vật chính có thể mỉa mai và sợ hãi, nhưng không được mất phản xạ cứu người.\n\nRàng buộc:\n\n- Không để Writer tự giải thích nguồn gốc cái nồi.\n- Không reveal secret của foreshadow trước khi Skeleton surface.\n- Không dùng tên nhân vật làm khóa liên kết.\n\n",
+        "premise": {
+          "title": "Nồi Canh Bên Đường",
+          "logline": "Sở Dương, một bác sĩ cấp cứu, tỉnh dậy ở Thương Ngô giới với cái nồi sắt đen và một hệ thống không biết thương lượng.",
+          "dramatic_question": "Anh có giữ được nguyên tắc cứu người khi chính thân thể mình không còn hoàn toàn nghe lời không?",
+          "themes": [
+            "quyền lựa chọn",
+            "phản xạ nghề nghiệp",
+            "lòng tốt không màu mè"
+          ],
+          "tone_contract": [
+            "Tiếng Việt tự nhiên.",
+            "Hài nhẹ đến từ phản ứng của nhân vật, không phá hiểm nguy."
+          ],
+          "hard_constraints": [
+            "Không reveal nguồn gốc cái nồi trong chương 1.",
+            "Không để Writer tự tạo major twist."
+          ],
+          "non_goals": [
+            "Không xây hệ thống agent trong app."
+          ]
+        },
+        "current_arc": {
+          "arc_id": "arc_0001",
+          "title": "Đêm đầu trên Vạn Linh sơn",
+          "chapter_range": {
+            "start": 1,
+            "end": 7
+          },
+          "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+          "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+          "start_state": "Tỉnh dậy đơn độc.",
+          "end_state": "Hiểu một phần luật cưỡng chế và có đồng minh miễn cưỡng.",
+          "major_reveals": [
+            "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+          ],
+          "character_ids": [
+            "char_0001",
+            "char_0002"
+          ],
+          "world_rule_ids": [
+            "rule_0001"
+          ],
+          "foreshadow_ids": [
+            "fs_0001"
+          ],
+          "relationship_directions": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+              "target_state": "Miễn cưỡng tin nhau",
+              "notes": "Đây là plan tương lai, không phải current relationship."
+            }
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Sở Dương",
+            "aliases": [
+              "Sở Đại Phu"
+            ],
+            "role": "protagonist",
+            "tier": "core",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Bác sĩ cấp cứu thời hiện đại, tỉnh dậy trong thân xác lạ.",
+              "traits": [
+                "điềm tĩnh khi khám bệnh",
+                "miệng tiện",
+                "cố chấp cứu người"
+              ],
+              "voice": "Mỉa mai ngắn, ưu tiên quan sát cụ thể.",
+              "known_history": "Chết trên đường vắng khi quay lại cứu người bị tai nạn."
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Giữ phản xạ kiểm tra triệu chứng và môi trường.",
+                "Có thể sợ nhưng không được suy diễn chắc chắn về thế giới mới."
+              ]
+            },
+            "author_only": {
+              "secret": "Thân xác nguyên chủ từng liên quan tới bí mật của cái nồi, chưa reveal."
+            },
+            "future_direction": {
+              "arc_0001": "Từ chỉ muốn sống qua đêm đầu sang chủ động cứu người trước mặt."
+            }
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Tiêu Như Ngọc",
+            "aliases": [],
+            "role": "ally_future",
+            "tier": "major",
+            "effective_from_chapter": 2,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Người giữ ánh lửa xa dưới thung lũng, sẽ xuất hiện trực tiếp từ chương 2.",
+              "traits": [
+                "thận trọng",
+                "giỏi quan sát"
+              ],
+              "voice": "Ít lời, hỏi thẳng.",
+              "known_history": ""
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Không xuất hiện trực tiếp trong chương 1."
+              ]
+            },
+            "author_only": {},
+            "future_direction": {
+              "arc_0001": "Từ nghi ngờ Sở Dương sang buộc phải hợp tác."
+            }
+          }
+        ],
+        "world_rules": [
+          {
+            "world_rule_id": "rule_0001",
+            "category": "Hệ thống",
+            "summary": "Giọng nói hệ thống chỉ phát câu lệnh cứng nhắc.",
+            "content": "Trong chương đầu, hệ thống chỉ có ba câu: chào ký chủ, thiếu nguyên liệu, bắt đầu thu thập nguyên liệu.",
+            "boundary": "Hệ thống không thương lượng, không giải thích, không bông đùa.",
+            "effective_from_chapter": 1,
+            "visibility": "writer_safe",
+            "writer_projection": "Hệ thống nói ngắn, lặp máy móc, không đối đáp.",
+            "author_only": {}
+          }
+        ],
+        "foreshadows": [
+          {
+            "foreshadow_id": "fs_0001",
+            "label": "Nguồn gốc cái nồi",
+            "truth_author_only": "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ.",
+            "planned_planting": [
+              {
+                "chapter_id": "ch_0001",
+                "surface_instruction": "Mô tả nồi rỉ xốp nhưng không móp khi gõ đá; không giải thích nguyên nhân.",
+                "visibility": "skeleton_only"
+              }
+            ],
+            "planned_payoff": null,
+            "effective_from_chapter": 1,
+            "writer_visibility": "skeleton_only",
+            "status": "active"
+          }
+        ],
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "recent_finalized_summaries": [],
+        "assigned_chapters": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1
+          },
+          {
+            "chapter_id": "ch_0002",
+            "chapter_number": 2
+          }
+        ],
+        "chapter_constraints": [
+          {
+            "chapter_id": "ch_0001",
+            "language": "vi",
+            "pov": "Ngôi ba giới hạn theo Sở Dương",
+            "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+          },
+          {
+            "chapter_id": "ch_0002",
+            "language": "vi",
+            "pov": "Ngôi ba giới hạn theo Sở Dương",
+            "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+          }
+        ],
+        "previous_short_plan": null,
+        "user_instruction": "Lập hai chương mở đầu của arc, chưa coi kế hoạch là actual.",
+        "context_basis": {
+          "mode": "actual",
+          "actual_through_chapter": 0,
+          "planned_bridge": []
+        }
+      },
+      "response": {
+        "arc_id": "arc_0001",
+        "chapters": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "title": "Đường vắng",
+            "summary": "Sở Dương chết khi cứu người rồi tỉnh dậy bên cái nồi sắt đen.",
+            "hook": "Thân thể tự bước lên sống núi trong bóng tối.",
+            "outline": [
+              {
+                "language": "vi",
+                "pov": "Ngôi ba giới hạn theo Sở Dương",
+                "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+              },
+              "Cấp cứu trên đường vắng và cái chết.",
+              "Tỉnh dậy trên sườn núi trong thân xác lạ.",
+              "Giọng nói cứng nhắc báo thiếu nguyên liệu.",
+              "Thân thể bị cưỡng chế đi ngược hướng ánh lửa."
+            ],
+            "character_ids": [
+              "char_0001"
+            ],
+            "world_rule_ids": [
+              "rule_0001"
+            ],
+            "foreshadow_ids": [
+              "fs_0001"
+            ],
+            "threads": [
+              "Nguồn gốc cái nồi"
+            ],
+            "relationship_changes": [],
+            "chapter_goal": "Thiết lập phản xạ cứu người và nỗi sợ thân thể không nghe mình.",
+            "planned_ending": "Sở Dương bị thân thể kéo xuống vách đá."
+          },
+          {
+            "chapter_id": "ch_0002",
+            "chapter_number": 2,
+            "title": "Ánh lửa dưới thung lũng",
+            "summary": "Sở Dương sống sót sau vách đá và chạm gần nguồn ánh lửa.",
+            "hook": "Có người ở gần nhưng anh không biết họ có cứu hay giết mình.",
+            "outline": [
+              {
+                "language": "vi",
+                "pov": "Ngôi ba giới hạn theo Sở Dương",
+                "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+              },
+              "Thoát khỏi vách đá bằng phản xạ và cái nồi.",
+              "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+            ],
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "world_rule_ids": [
+              "rule_0001"
+            ],
+            "foreshadow_ids": [
+              "fs_0001"
+            ],
+            "threads": [
+              "Nguồn gốc cái nồi"
+            ],
+            "relationship_changes": [
+              {
+                "character_ids": [
+                  "char_0001",
+                  "char_0002"
+                ],
+                "arc_direction": "từ chưa gặp sang dè chừng",
+                "target_state": "Dè chừng lẫn nhau",
+                "notes": "Plan cho chapter 2, chưa phải current state."
+              }
+            ],
+            "chapter_goal": "Đưa quan hệ tương lai vào vùng va chạm.",
+            "planned_ending": "Hai người nhận ra cùng có thứ đang theo dõi."
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "rolling_adjust",
+      "prompt_id": "rolling_plan.v1",
+      "request": {
+        "current_arc": {
+          "arc_id": "arc_0001",
+          "title": "Đêm đầu trên Vạn Linh sơn",
+          "chapter_range": {
+            "start": 1,
+            "end": 7
+          },
+          "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+          "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+          "start_state": "Tỉnh dậy đơn độc.",
+          "end_state": "Hiểu một phần luật cưỡng chế và có đồng minh miễn cưỡng.",
+          "major_reveals": [
+            "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+          ],
+          "character_ids": [
+            "char_0001",
+            "char_0002"
+          ],
+          "world_rule_ids": [
+            "rule_0001"
+          ],
+          "foreshadow_ids": [
+            "fs_0001"
+          ],
+          "relationship_directions": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+              "target_state": "Miễn cưỡng tin nhau",
+              "notes": "Đây là plan tương lai, không phải current relationship."
+            }
+          ]
+        },
+        "current_short_plan": {
+          "arc_id": "arc_0001",
+          "chapters": [
+            {
+              "chapter_id": "ch_0001",
+              "chapter_number": 1,
+              "title": "Đường vắng",
+              "summary": "Sở Dương chết khi cứu người rồi tỉnh dậy bên cái nồi sắt đen.",
+              "hook": "Thân thể tự bước lên sống núi trong bóng tối.",
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Cấp cứu trên đường vắng và cái chết.",
+                "Tỉnh dậy trên sườn núi trong thân xác lạ.",
+                "Giọng nói cứng nhắc báo thiếu nguyên liệu.",
+                "Thân thể bị cưỡng chế đi ngược hướng ánh lửa."
+              ],
+              "character_ids": [
+                "char_0001"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "Nguồn gốc cái nồi"
+              ],
+              "relationship_changes": [],
+              "chapter_goal": "Thiết lập phản xạ cứu người và nỗi sợ thân thể không nghe mình.",
+              "planned_ending": "Sở Dương bị thân thể kéo xuống vách đá."
+            },
+            {
+              "chapter_id": "ch_0002",
+              "chapter_number": 2,
+              "title": "Ánh lửa dưới thung lũng",
+              "summary": "Sở Dương sống sót sau vách đá và chạm gần nguồn ánh lửa.",
+              "hook": "Có người ở gần nhưng anh không biết họ có cứu hay giết mình.",
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Thoát khỏi vách đá bằng phản xạ và cái nồi.",
+                "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+              ],
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "Nguồn gốc cái nồi"
+              ],
+              "relationship_changes": [
+                {
+                  "character_ids": [
+                    "char_0001",
+                    "char_0002"
+                  ],
+                  "arc_direction": "từ chưa gặp sang dè chừng",
+                  "target_state": "Dè chừng lẫn nhau",
+                  "notes": "Plan cho chapter 2, chưa phải current state."
+                }
+              ],
+              "chapter_goal": "Đưa quan hệ tương lai vào vùng va chạm.",
+              "planned_ending": "Hai người nhận ra cùng có thứ đang theo dõi."
+            }
+          ]
+        },
+        "timeline_as_of": [
+          {
+            "timeline_id": "timeline_0001",
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "time": "Đêm đầu sau khi tỉnh dậy",
+            "location": "Sườn Vạn Linh sơn",
+            "status": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+            "source_final_revision": {
+              "chapter_id": "ch_0001",
+              "revision": 1
+            },
+            "accepted_at": "2026-09-19T10:00:00+07:00"
+          }
+        ],
+        "relationships_as_of": [
+          {
+            "relationship_id": "rel_0001",
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+            "last_updated_chapter": 1,
+            "history": [
+              {
+                "chapter_id": "ch_0001",
+                "chapter_number": 1,
+                "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+                "source_final_revision": 1
+              }
+            ]
+          }
+        ],
+        "recent_finalized_summaries": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "summary": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi."
+          }
+        ],
+        "reviewed_chapter_range": {
+          "start": 1,
+          "end": 1
+        },
+        "latest_consistent_chapter": 1,
+        "eligible_chapters": [
+          {
+            "chapter_id": "ch_0002",
+            "chapter_number": 2
+          }
+        ],
+        "allow_relationship_replan": false,
+        "user_instruction": "Nối chương 2 từ actual đang lên sống núi; giữ nguyên hướng quan hệ."
+      },
+      "response": {
+        "status": "adjust",
+        "reviewed_chapter_range": {
+          "start": 1,
+          "end": 1
+        },
+        "deviations": [
+          {
+            "chapter_id": "ch_0001",
+            "planned": "Sở Dương bị thân thể kéo xuống vách đá.",
+            "actual": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+            "evidence": "recent_finalized_summaries ch_0001 và timeline_0001: kết ở bước lên sống núi, chưa có cảnh xuống vách đá."
+          }
+        ],
+        "short_plan_changes": [
+          {
+            "chapter_id": "ch_0002",
+            "changes": {
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Tiếp nối bước chân bị cưỡng chế lên sống núi, rồi trượt xuống mép đá và thoát nhờ phản xạ cùng cái nồi.",
+                "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+              ]
+            },
+            "reason": "Chỉ bổ sung đường nối trong chương tương lai, giữ sự kiện thoát vách đá và hướng quan hệ đã lập."
+          }
+        ],
+        "relationship_plan_changes": [],
+        "blocked_by_authority": []
+      }
+    },
+    {
+      "case_id": "rolling_relationship_blocked",
+      "prompt_id": "rolling_plan.v1",
+      "request": {
+        "current_arc": {
+          "arc_id": "arc_0001",
+          "title": "Đêm đầu trên Vạn Linh sơn",
+          "chapter_range": {
+            "start": 1,
+            "end": 7
+          },
+          "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+          "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+          "start_state": "Tỉnh dậy đơn độc.",
+          "end_state": "Hiểu một phần luật cưỡng chế và có đồng minh miễn cưỡng.",
+          "major_reveals": [
+            "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+          ],
+          "character_ids": [
+            "char_0001",
+            "char_0002"
+          ],
+          "world_rule_ids": [
+            "rule_0001"
+          ],
+          "foreshadow_ids": [
+            "fs_0001"
+          ],
+          "relationship_directions": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+              "target_state": "Miễn cưỡng tin nhau",
+              "notes": "Đây là plan tương lai, không phải current relationship."
+            }
+          ]
+        },
+        "current_short_plan": {
+          "arc_id": "arc_0001",
+          "chapters": [
+            {
+              "chapter_id": "ch_0001",
+              "chapter_number": 1,
+              "title": "Đường vắng",
+              "summary": "Sở Dương chết khi cứu người rồi tỉnh dậy bên cái nồi sắt đen.",
+              "hook": "Thân thể tự bước lên sống núi trong bóng tối.",
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Cấp cứu trên đường vắng và cái chết.",
+                "Tỉnh dậy trên sườn núi trong thân xác lạ.",
+                "Giọng nói cứng nhắc báo thiếu nguyên liệu.",
+                "Thân thể bị cưỡng chế đi ngược hướng ánh lửa."
+              ],
+              "character_ids": [
+                "char_0001"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "Nguồn gốc cái nồi"
+              ],
+              "relationship_changes": [],
+              "chapter_goal": "Thiết lập phản xạ cứu người và nỗi sợ thân thể không nghe mình.",
+              "planned_ending": "Sở Dương bị thân thể kéo xuống vách đá."
+            },
+            {
+              "chapter_id": "ch_0002",
+              "chapter_number": 2,
+              "title": "Ánh lửa dưới thung lũng",
+              "summary": "Sở Dương sống sót sau vách đá và chạm gần nguồn ánh lửa.",
+              "hook": "Có người ở gần nhưng anh không biết họ có cứu hay giết mình.",
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Thoát khỏi vách đá bằng phản xạ và cái nồi.",
+                "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+              ],
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "Nguồn gốc cái nồi"
+              ],
+              "relationship_changes": [
+                {
+                  "character_ids": [
+                    "char_0001",
+                    "char_0002"
+                  ],
+                  "arc_direction": "từ chưa gặp sang dè chừng",
+                  "target_state": "Dè chừng lẫn nhau",
+                  "notes": "Plan cho chapter 2, chưa phải current state."
+                }
+              ],
+              "chapter_goal": "Đưa quan hệ tương lai vào vùng va chạm.",
+              "planned_ending": "Hai người nhận ra cùng có thứ đang theo dõi."
+            }
+          ]
+        },
+        "timeline_as_of": [
+          {
+            "timeline_id": "timeline_0001",
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "time": "Đêm đầu sau khi tỉnh dậy",
+            "location": "Sườn Vạn Linh sơn",
+            "status": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+            "source_final_revision": {
+              "chapter_id": "ch_0001",
+              "revision": 1
+            },
+            "accepted_at": "2026-09-19T10:00:00+07:00"
+          }
+        ],
+        "relationships_as_of": [
+          {
+            "relationship_id": "rel_0001",
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+            "last_updated_chapter": 1,
+            "history": [
+              {
+                "chapter_id": "ch_0001",
+                "chapter_number": 1,
+                "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+                "source_final_revision": 1
+              }
+            ]
+          }
+        ],
+        "recent_finalized_summaries": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "summary": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi."
+          }
+        ],
+        "reviewed_chapter_range": {
+          "start": 1,
+          "end": 1
+        },
+        "latest_consistent_chapter": 1,
+        "eligible_chapters": [
+          {
+            "chapter_id": "ch_0002",
+            "chapter_number": 2
+          }
+        ],
+        "allow_relationship_replan": false,
+        "user_instruction": "Cho hai người lập tức tin nhau ở chương 2."
+      },
+      "response": {
+        "status": "adjust",
+        "reviewed_chapter_range": {
+          "start": 1,
+          "end": 1
+        },
+        "deviations": [
+          {
+            "chapter_id": "ch_0001",
+            "planned": "Sở Dương bị thân thể kéo xuống vách đá.",
+            "actual": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+            "evidence": "recent_finalized_summaries ch_0001 và timeline_0001: kết ở bước lên sống núi, chưa có cảnh xuống vách đá."
+          }
+        ],
+        "short_plan_changes": [],
+        "relationship_plan_changes": [],
+        "blocked_by_authority": [
+          {
+            "chapter_id": "ch_0002",
+            "authority": "allow_relationship_replan=false",
+            "reason": "Không đổi hướng quan hệ, kể cả gián tiếp qua outline; actual vẫn chưa gặp."
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "rolling_relationship_allowed",
+      "prompt_id": "rolling_plan.v1",
+      "request": {
+        "current_arc": {
+          "arc_id": "arc_0001",
+          "title": "Đêm đầu trên Vạn Linh sơn",
+          "chapter_range": {
+            "start": 1,
+            "end": 7
+          },
+          "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+          "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+          "start_state": "Tỉnh dậy đơn độc.",
+          "end_state": "Hiểu một phần luật cưỡng chế và có đồng minh miễn cưỡng.",
+          "major_reveals": [
+            "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+          ],
+          "character_ids": [
+            "char_0001",
+            "char_0002"
+          ],
+          "world_rule_ids": [
+            "rule_0001"
+          ],
+          "foreshadow_ids": [
+            "fs_0001"
+          ],
+          "relationship_directions": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+              "target_state": "Miễn cưỡng tin nhau",
+              "notes": "Đây là plan tương lai, không phải current relationship."
+            }
+          ]
+        },
+        "current_short_plan": {
+          "arc_id": "arc_0001",
+          "chapters": [
+            {
+              "chapter_id": "ch_0001",
+              "chapter_number": 1,
+              "title": "Đường vắng",
+              "summary": "Sở Dương chết khi cứu người rồi tỉnh dậy bên cái nồi sắt đen.",
+              "hook": "Thân thể tự bước lên sống núi trong bóng tối.",
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Cấp cứu trên đường vắng và cái chết.",
+                "Tỉnh dậy trên sườn núi trong thân xác lạ.",
+                "Giọng nói cứng nhắc báo thiếu nguyên liệu.",
+                "Thân thể bị cưỡng chế đi ngược hướng ánh lửa."
+              ],
+              "character_ids": [
+                "char_0001"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "Nguồn gốc cái nồi"
+              ],
+              "relationship_changes": [],
+              "chapter_goal": "Thiết lập phản xạ cứu người và nỗi sợ thân thể không nghe mình.",
+              "planned_ending": "Sở Dương bị thân thể kéo xuống vách đá."
+            },
+            {
+              "chapter_id": "ch_0002",
+              "chapter_number": 2,
+              "title": "Ánh lửa dưới thung lũng",
+              "summary": "Sở Dương sống sót sau vách đá và chạm gần nguồn ánh lửa.",
+              "hook": "Có người ở gần nhưng anh không biết họ có cứu hay giết mình.",
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Thoát khỏi vách đá bằng phản xạ và cái nồi.",
+                "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+              ],
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "Nguồn gốc cái nồi"
+              ],
+              "relationship_changes": [
+                {
+                  "character_ids": [
+                    "char_0001",
+                    "char_0002"
+                  ],
+                  "arc_direction": "từ chưa gặp sang dè chừng",
+                  "target_state": "Dè chừng lẫn nhau",
+                  "notes": "Plan cho chapter 2, chưa phải current state."
+                }
+              ],
+              "chapter_goal": "Đưa quan hệ tương lai vào vùng va chạm.",
+              "planned_ending": "Hai người nhận ra cùng có thứ đang theo dõi."
+            }
+          ]
+        },
+        "timeline_as_of": [
+          {
+            "timeline_id": "timeline_0001",
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "time": "Đêm đầu sau khi tỉnh dậy",
+            "location": "Sườn Vạn Linh sơn",
+            "status": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+            "source_final_revision": {
+              "chapter_id": "ch_0001",
+              "revision": 1
+            },
+            "accepted_at": "2026-09-19T10:00:00+07:00"
+          }
+        ],
+        "relationships_as_of": [
+          {
+            "relationship_id": "rel_0001",
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+            "last_updated_chapter": 1,
+            "history": [
+              {
+                "chapter_id": "ch_0001",
+                "chapter_number": 1,
+                "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+                "source_final_revision": 1
+              }
+            ]
+          }
+        ],
+        "recent_finalized_summaries": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "summary": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi."
+          }
+        ],
+        "reviewed_chapter_range": {
+          "start": 1,
+          "end": 1
+        },
+        "latest_consistent_chapter": 1,
+        "eligible_chapters": [
+          {
+            "chapter_id": "ch_0002",
+            "chapter_number": 2
+          }
+        ],
+        "allow_relationship_replan": true,
+        "user_instruction": "Giữ dè chừng nhưng cho họ chỉ hỏi đáp từ xa, chưa đồng ý hợp tác."
+      },
+      "response": {
+        "status": "adjust",
+        "reviewed_chapter_range": {
+          "start": 1,
+          "end": 1
+        },
+        "deviations": [
+          {
+            "chapter_id": "ch_0001",
+            "planned": "Sở Dương bị thân thể kéo xuống vách đá.",
+            "actual": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+            "evidence": "recent_finalized_summaries ch_0001 và timeline_0001: kết ở bước lên sống núi, chưa có cảnh xuống vách đá."
+          }
+        ],
+        "short_plan_changes": [
+          {
+            "chapter_id": "ch_0002",
+            "changes": {
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Tiếp nối bước chân bị cưỡng chế lên sống núi, rồi trượt xuống mép đá và thoát nhờ phản xạ cùng cái nồi.",
+                "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+              ]
+            },
+            "reason": "Chỉ bổ sung đường nối trong chương tương lai, giữ sự kiện thoát vách đá và hướng quan hệ đã lập."
+          }
+        ],
+        "relationship_plan_changes": [
+          {
+            "chapter_id": "ch_0002",
+            "relationship_changes": [
+              {
+                "character_ids": [
+                  "char_0001",
+                  "char_0002"
+                ],
+                "arc_direction": "từ chưa gặp sang dè chừng",
+                "target_state": "Dè chừng lẫn nhau",
+                "notes": "Dè chừng qua hỏi đáp từ xa, chưa đồng ý hợp tác; vẫn tiến về đồng minh miễn cưỡng cuối arc."
+              }
+            ],
+            "reason": "Chỉnh nhịp future direction trong cùng đích arc; không đổi current."
+          }
+        ],
+        "blocked_by_authority": []
+      }
+    },
+    {
+      "case_id": "rolling_ok",
+      "prompt_id": "rolling_plan.v1",
+      "request": {
+        "current_arc": {
+          "arc_id": "arc_0001",
+          "title": "Đêm đầu trên Vạn Linh sơn",
+          "chapter_range": {
+            "start": 1,
+            "end": 7
+          },
+          "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+          "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+          "start_state": "Tỉnh dậy đơn độc.",
+          "end_state": "Hiểu một phần luật cưỡng chế và có đồng minh miễn cưỡng.",
+          "major_reveals": [
+            "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+          ],
+          "character_ids": [
+            "char_0001",
+            "char_0002"
+          ],
+          "world_rule_ids": [
+            "rule_0001"
+          ],
+          "foreshadow_ids": [
+            "fs_0001"
+          ],
+          "relationship_directions": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+              "target_state": "Miễn cưỡng tin nhau",
+              "notes": "Đây là plan tương lai, không phải current relationship."
+            }
+          ]
+        },
+        "current_short_plan": {
+          "arc_id": "arc_0001",
+          "chapters": [
+            {
+              "chapter_id": "ch_0001",
+              "chapter_number": 1,
+              "title": "Đường vắng",
+              "summary": "Sở Dương chết khi cứu người rồi tỉnh dậy bên cái nồi sắt đen.",
+              "hook": "Thân thể tự bước lên sống núi trong bóng tối.",
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Cấp cứu trên đường vắng và cái chết.",
+                "Tỉnh dậy trên sườn núi trong thân xác lạ.",
+                "Giọng nói cứng nhắc báo thiếu nguyên liệu.",
+                "Thân thể bị cưỡng chế đi ngược hướng ánh lửa."
+              ],
+              "character_ids": [
+                "char_0001"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "Nguồn gốc cái nồi"
+              ],
+              "relationship_changes": [],
+              "chapter_goal": "Thiết lập phản xạ cứu người và nỗi sợ thân thể không nghe mình.",
+              "planned_ending": "Thân thể tự bước lên sống núi trong bóng tối."
+            },
+            {
+              "chapter_id": "ch_0002",
+              "chapter_number": 2,
+              "title": "Ánh lửa dưới thung lũng",
+              "summary": "Sở Dương sống sót sau vách đá và chạm gần nguồn ánh lửa.",
+              "hook": "Có người ở gần nhưng anh không biết họ có cứu hay giết mình.",
+              "outline": [
+                {
+                  "language": "vi",
+                  "pov": "Ngôi ba giới hạn theo Sở Dương",
+                  "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+                },
+                "Tiếp nối bước chân bị cưỡng chế lên sống núi, rồi trượt xuống mép đá và thoát nhờ phản xạ cùng cái nồi.",
+                "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+              ],
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "Nguồn gốc cái nồi"
+              ],
+              "relationship_changes": [
+                {
+                  "character_ids": [
+                    "char_0001",
+                    "char_0002"
+                  ],
+                  "arc_direction": "từ chưa gặp sang dè chừng",
+                  "target_state": "Dè chừng lẫn nhau",
+                  "notes": "Plan cho chapter 2, chưa phải current state."
+                }
+              ],
+              "chapter_goal": "Đưa quan hệ tương lai vào vùng va chạm.",
+              "planned_ending": "Hai người nhận ra cùng có thứ đang theo dõi."
+            }
+          ]
+        },
+        "timeline_as_of": [
+          {
+            "timeline_id": "timeline_0001",
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "time": "Đêm đầu sau khi tỉnh dậy",
+            "location": "Sườn Vạn Linh sơn",
+            "status": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+            "source_final_revision": {
+              "chapter_id": "ch_0001",
+              "revision": 1
+            },
+            "accepted_at": "2026-09-19T10:00:00+07:00"
+          }
+        ],
+        "relationships_as_of": [
+          {
+            "relationship_id": "rel_0001",
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+            "last_updated_chapter": 1,
+            "history": [
+              {
+                "chapter_id": "ch_0001",
+                "chapter_number": 1,
+                "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+                "source_final_revision": 1
+              }
+            ]
+          }
+        ],
+        "recent_finalized_summaries": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "summary": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi."
+          }
+        ],
+        "reviewed_chapter_range": {
+          "start": 1,
+          "end": 1
+        },
+        "latest_consistent_chapter": 1,
+        "eligible_chapters": [
+          {
+            "chapter_id": "ch_0002",
+            "chapter_number": 2
+          }
+        ],
+        "allow_relationship_replan": false,
+        "user_instruction": "Kiểm tra continuity gần, không đổi nếu đã nối được."
+      },
+      "response": {
+        "status": "ok",
+        "reviewed_chapter_range": {
+          "start": 1,
+          "end": 1
+        },
+        "deviations": [],
+        "short_plan_changes": [],
+        "relationship_plan_changes": [],
+        "blocked_by_authority": []
+      }
+    },
+    {
+      "case_id": "skeleton_ch1",
+      "prompt_id": "skeleton.v1",
+      "request": {
+        "action": "generate",
+        "base_idea_constraints": [
+          "Giữ phản xạ cứu người.",
+          "Không giải thích nguồn gốc cái nồi."
+        ],
+        "premise_constraints": [
+          "Không reveal nguồn gốc cái nồi trong chương 1.",
+          "Không để Writer tự tạo major twist."
+        ],
+        "current_arc": {
+          "arc_id": "arc_0001",
+          "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+          "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+          "major_reveals": [
+            "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+          ],
+          "relationship_directions": []
+        },
+        "chapter_plan": {
+          "chapter_id": "ch_0001",
+          "chapter_number": 1,
+          "title": "Đường vắng",
+          "summary": "Sở Dương chết khi cứu người rồi tỉnh dậy bên cái nồi sắt đen.",
+          "hook": "Thân thể tự bước lên sống núi trong bóng tối.",
+          "outline": [
+            {
+              "language": "vi",
+              "pov": "Ngôi ba giới hạn theo Sở Dương",
+              "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+            },
+            "Cấp cứu trên đường vắng và cái chết.",
+            "Tỉnh dậy trên sườn núi trong thân xác lạ.",
+            "Giọng nói cứng nhắc báo thiếu nguyên liệu.",
+            "Thân thể bị cưỡng chế đi ngược hướng ánh lửa."
+          ],
+          "character_ids": [
+            "char_0001"
+          ],
+          "world_rule_ids": [
+            "rule_0001"
+          ],
+          "foreshadow_ids": [
+            "fs_0001"
+          ],
+          "threads": [
+            "Nguồn gốc cái nồi"
+          ],
+          "relationship_changes": [],
+          "chapter_goal": "Thiết lập phản xạ cứu người và nỗi sợ thân thể không nghe mình.",
+          "planned_ending": "Sở Dương bị thân thể kéo xuống vách đá."
+        },
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "previous_final_summary": null,
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Sở Dương",
+            "aliases": [
+              "Sở Đại Phu"
+            ],
+            "role": "protagonist",
+            "tier": "core",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Bác sĩ cấp cứu thời hiện đại, tỉnh dậy trong thân xác lạ.",
+              "traits": [
+                "điềm tĩnh khi khám bệnh",
+                "miệng tiện",
+                "cố chấp cứu người"
+              ],
+              "voice": "Mỉa mai ngắn, ưu tiên quan sát cụ thể.",
+              "known_history": "Chết trên đường vắng khi quay lại cứu người bị tai nạn."
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Giữ phản xạ kiểm tra triệu chứng và môi trường.",
+                "Có thể sợ nhưng không được suy diễn chắc chắn về thế giới mới."
+              ]
+            },
+            "author_only": {
+              "secret": "Thân xác nguyên chủ từng liên quan tới bí mật của cái nồi, chưa reveal."
+            },
+            "future_direction": {
+              "arc_0001": "Từ chỉ muốn sống qua đêm đầu sang chủ động cứu người trước mặt."
+            }
+          }
+        ],
+        "world_rules": [
+          {
+            "world_rule_id": "rule_0001",
+            "category": "Hệ thống",
+            "summary": "Giọng nói hệ thống chỉ phát câu lệnh cứng nhắc.",
+            "content": "Trong chương đầu, hệ thống chỉ có ba câu: chào ký chủ, thiếu nguyên liệu, bắt đầu thu thập nguyên liệu.",
+            "boundary": "Hệ thống không thương lượng, không giải thích, không bông đùa.",
+            "effective_from_chapter": 1,
+            "visibility": "writer_safe",
+            "writer_projection": "Hệ thống nói ngắn, lặp máy móc, không đối đáp.",
+            "author_only": {}
+          }
+        ],
+        "foreshadows": [
+          {
+            "foreshadow_id": "fs_0001",
+            "label": "Nguồn gốc cái nồi",
+            "truth_author_only": "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ.",
+            "planned_planting": [
+              {
+                "chapter_id": "ch_0001",
+                "surface_instruction": "Mô tả nồi rỉ xốp nhưng không móp khi gõ đá; không giải thích nguyên nhân.",
+                "visibility": "skeleton_only"
+              }
+            ],
+            "planned_payoff": null,
+            "effective_from_chapter": 1,
+            "writer_visibility": "skeleton_only",
+            "status": "active"
+          }
+        ],
+        "assigned_section_ids": [
+          "section_0001",
+          "section_0002",
+          "section_0003",
+          "section_0004",
+          "section_0099"
+        ],
+        "previous_skeleton": null,
+        "user_instruction": "Triển khai đúng plan và actual đầu chương; hint không có lời giải.",
+        "context_basis": {
+          "mode": "actual",
+          "actual_through_chapter": 0,
+          "planned_bridge": []
+        }
+      },
+      "response": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 1,
+        "sections": [
+          {
+            "section_id": "section_0001",
+            "index": 1,
+            "type": "action",
+            "instruction": "Thể hiện hồi cảnh Sở Dương quay lại cứu nạn nhân trên đường vắng và chết; chuyển sang lúc tỉnh trên sườn núi.",
+            "purpose": "Đặt phản xạ cứu người trước nhu cầu tự cứu.",
+            "purpose_visibility": "writer_safe",
+            "writer_notes": [],
+            "author_only_notes": [],
+            "required_beats": [
+              "quay lại cứu người",
+              "tỉnh trong thân xác lạ"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001"
+            ],
+            "world_rule_ids": [],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          },
+          {
+            "section_id": "section_0002",
+            "index": 2,
+            "type": "foreshadow",
+            "instruction": "Cho Sở Dương gõ đá vào nồi; chỉ mô tả độ cứng bất thường và sự nghi ngờ.",
+            "purpose": "Giữ bí mật nguồn gốc vật phẩm cho nhịp sau.",
+            "purpose_visibility": "planner_only",
+            "writer_notes": [],
+            "author_only_notes": [
+              "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ."
+            ],
+            "required_beats": [
+              "rỉ xốp",
+              "gõ đá không móp"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001"
+            ],
+            "world_rule_ids": [
+              "rule_0001"
+            ],
+            "foreshadow_ids": [
+              "fs_0001"
+            ],
+            "foreshadow_surfaces": [
+              {
+                "foreshadow_id": "fs_0001",
+                "surface_instruction": "Nồi rỉ xốp nhưng không móp khi gõ đá; chỉ quan sát, không lý giải.",
+                "reveal_policy": "hint_only"
+              }
+            ]
+          },
+          {
+            "section_id": "section_0003",
+            "index": 3,
+            "type": "action",
+            "instruction": "Thể hiện ba câu hệ thống cứng nhắc: chào ký chủ, thiếu nguyên liệu, bắt đầu thu thập nguyên liệu. Thân thể đứng dậy, quay lưng với ánh lửa và đi lên sống núi.",
+            "purpose": "Tăng áp lực mất quyền tự quyết.",
+            "purpose_visibility": "writer_safe",
+            "writer_notes": [],
+            "author_only_notes": [],
+            "required_beats": [
+              "hệ thống không trả lời",
+              "đi ngược ánh lửa"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001"
+            ],
+            "world_rule_ids": [
+              "rule_0001"
+            ],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          },
+          {
+            "section_id": "section_0004",
+            "index": 4,
+            "type": "ending",
+            "instruction": "Kết khi Sở Dương bị thân thể kéo xuống vách đá, chưa giải quyết sống sót.",
+            "purpose": "Giữ ending được Short Plan giao.",
+            "purpose_visibility": "writer_safe",
+            "writer_notes": [],
+            "author_only_notes": [],
+            "required_beats": [
+              "bị kéo xuống vách đá"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001"
+            ],
+            "world_rule_ids": [],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          }
+        ],
+        "global_constraints": [
+          "Ngôn ngữ: vi; POV: Ngôi ba giới hạn theo Sở Dương; độ dài: Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng.",
+          "Không giải thích nguồn gốc cái nồi.",
+          "Không thêm major plot hoặc foreshadow ngoài sections.",
+          "Người ở ánh lửa chưa xuất hiện trực tiếp; không xác định danh tính."
+        ],
+        "writer_context_policy": {
+          "include_author_only": false,
+          "include_future_plan": false
+        }
+      }
+    },
+    {
+      "case_id": "skeleton_ch2",
+      "prompt_id": "skeleton.v1",
+      "request": {
+        "action": "generate",
+        "base_idea_constraints": [
+          "Giữ phản xạ cứu người.",
+          "Không giải thích nguồn gốc cái nồi."
+        ],
+        "premise_constraints": [
+          "Không reveal nguồn gốc cái nồi trong chương 1.",
+          "Không để Writer tự tạo major twist."
+        ],
+        "current_arc": {
+          "arc_id": "arc_0001",
+          "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+          "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+          "major_reveals": [
+            "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+          ],
+          "relationship_directions": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+              "target_state": "Miễn cưỡng tin nhau",
+              "notes": "Đây là plan tương lai, không phải current relationship."
+            }
+          ]
+        },
+        "chapter_plan": {
+          "chapter_id": "ch_0002",
+          "chapter_number": 2,
+          "title": "Ánh lửa dưới thung lũng",
+          "summary": "Sở Dương sống sót sau vách đá và chạm gần nguồn ánh lửa.",
+          "hook": "Có người ở gần nhưng anh không biết họ có cứu hay giết mình.",
+          "outline": [
+            {
+              "language": "vi",
+              "pov": "Ngôi ba giới hạn theo Sở Dương",
+              "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+            },
+            "Tiếp nối bước chân bị cưỡng chế lên sống núi, rồi trượt xuống mép đá và thoát nhờ phản xạ cùng cái nồi.",
+            "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+          ],
+          "character_ids": [
+            "char_0001",
+            "char_0002"
+          ],
+          "world_rule_ids": [
+            "rule_0001"
+          ],
+          "foreshadow_ids": [
+            "fs_0001"
+          ],
+          "threads": [
+            "Nguồn gốc cái nồi"
+          ],
+          "relationship_changes": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang dè chừng",
+              "target_state": "Dè chừng lẫn nhau",
+              "notes": "Plan cho chapter 2, chưa phải current state."
+            }
+          ],
+          "chapter_goal": "Đưa quan hệ tương lai vào vùng va chạm.",
+          "planned_ending": "Hai người nhận ra cùng có thứ đang theo dõi."
+        },
+        "timeline_as_of": [
+          {
+            "timeline_id": "timeline_0001",
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "time": "Đêm đầu sau khi tỉnh dậy",
+            "location": "Sườn Vạn Linh sơn",
+            "status": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+            "source_final_revision": {
+              "chapter_id": "ch_0001",
+              "revision": 1
+            },
+            "accepted_at": "2026-09-19T10:00:00+07:00"
+          }
+        ],
+        "relationships_as_of": [
+          {
+            "relationship_id": "rel_0001",
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+            "last_updated_chapter": 1,
+            "history": [
+              {
+                "chapter_id": "ch_0001",
+                "chapter_number": 1,
+                "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+                "source_final_revision": 1
+              }
+            ]
+          }
+        ],
+        "previous_final_summary": {
+          "chapter_id": "ch_0001",
+          "chapter_number": 1,
+          "summary": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi."
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Sở Dương",
+            "aliases": [
+              "Sở Đại Phu"
+            ],
+            "role": "protagonist",
+            "tier": "core",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Bác sĩ cấp cứu thời hiện đại, tỉnh dậy trong thân xác lạ.",
+              "traits": [
+                "điềm tĩnh khi khám bệnh",
+                "miệng tiện",
+                "cố chấp cứu người"
+              ],
+              "voice": "Mỉa mai ngắn, ưu tiên quan sát cụ thể.",
+              "known_history": "Chết trên đường vắng khi quay lại cứu người bị tai nạn."
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Giữ phản xạ kiểm tra triệu chứng và môi trường.",
+                "Có thể sợ nhưng không được suy diễn chắc chắn về thế giới mới."
+              ]
+            },
+            "author_only": {
+              "secret": "Thân xác nguyên chủ từng liên quan tới bí mật của cái nồi, chưa reveal."
+            },
+            "future_direction": {
+              "arc_0001": "Từ chỉ muốn sống qua đêm đầu sang chủ động cứu người trước mặt."
+            }
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Tiêu Như Ngọc",
+            "aliases": [],
+            "role": "ally_future",
+            "tier": "major",
+            "effective_from_chapter": 2,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Người giữ ánh lửa xa dưới thung lũng, sẽ xuất hiện trực tiếp từ chương 2.",
+              "traits": [
+                "thận trọng",
+                "giỏi quan sát"
+              ],
+              "voice": "Ít lời, hỏi thẳng.",
+              "known_history": ""
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Không xuất hiện trực tiếp trong chương 1."
+              ]
+            },
+            "author_only": {},
+            "future_direction": {
+              "arc_0001": "Từ nghi ngờ Sở Dương sang buộc phải hợp tác."
+            }
+          }
+        ],
+        "world_rules": [
+          {
+            "world_rule_id": "rule_0001",
+            "category": "Hệ thống",
+            "summary": "Giọng nói hệ thống chỉ phát câu lệnh cứng nhắc.",
+            "content": "Trong chương đầu, hệ thống chỉ có ba câu: chào ký chủ, thiếu nguyên liệu, bắt đầu thu thập nguyên liệu.",
+            "boundary": "Hệ thống không thương lượng, không giải thích, không bông đùa.",
+            "effective_from_chapter": 1,
+            "visibility": "writer_safe",
+            "writer_projection": "Hệ thống nói ngắn, lặp máy móc, không đối đáp.",
+            "author_only": {}
+          }
+        ],
+        "foreshadows": [
+          {
+            "foreshadow_id": "fs_0001",
+            "label": "Nguồn gốc cái nồi",
+            "truth_author_only": "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ.",
+            "planned_planting": [
+              {
+                "chapter_id": "ch_0001",
+                "surface_instruction": "Mô tả nồi rỉ xốp nhưng không móp khi gõ đá; không giải thích nguyên nhân.",
+                "visibility": "skeleton_only"
+              }
+            ],
+            "planned_payoff": null,
+            "effective_from_chapter": 1,
+            "writer_visibility": "skeleton_only",
+            "status": "active"
+          }
+        ],
+        "assigned_section_ids": [
+          "section_0005",
+          "section_0006",
+          "section_0007",
+          "section_0099"
+        ],
+        "previous_skeleton": null,
+        "user_instruction": "Triển khai đúng plan và actual đầu chương; hint không có lời giải.",
+        "context_basis": {
+          "mode": "actual",
+          "actual_through_chapter": 1,
+          "planned_bridge": []
+        }
+      },
+      "response": {
+        "chapter_id": "ch_0002",
+        "chapter_number": 2,
+        "sections": [
+          {
+            "section_id": "section_0005",
+            "index": 1,
+            "type": "action",
+            "instruction": "Mở đúng lúc thân thể đang đi lên sống núi; nối sang mép đá, trượt xuống và dùng phản xạ cùng cái nồi thoát nguy. Không coi cú trượt đã xảy ra ở chương trước.",
+            "purpose": "Nối actual với sự kiện đã lập cho chương này.",
+            "purpose_visibility": "planner_only",
+            "writer_notes": [],
+            "author_only_notes": [
+              "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ."
+            ],
+            "required_beats": [
+              "đang lên sống núi",
+              "thoát vách đá bằng phản xạ và cái nồi"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001"
+            ],
+            "world_rule_ids": [
+              "rule_0001"
+            ],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          },
+          {
+            "section_id": "section_0006",
+            "index": 2,
+            "type": "dialogue",
+            "instruction": "Cho Sở Dương lần theo động tĩnh gần ánh lửa, nghe rồi đối diện Tiêu Như Ngọc. Hai người hỏi ngắn để biết đối phương có nguy hiểm không; giữ khoảng cách và chưa hứa hợp tác.",
+            "purpose": "Chuyển từ chưa gặp sang dè chừng.",
+            "purpose_visibility": "writer_safe",
+            "writer_notes": [],
+            "author_only_notes": [],
+            "required_beats": [
+              "nghe động tĩnh",
+              "hỏi dò từ khoảng cách an toàn"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "world_rule_ids": [],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          },
+          {
+            "section_id": "section_0007",
+            "index": 3,
+            "type": "ending",
+            "instruction": "Kết khi cả hai nhận ra dấu hiệu có thứ đang theo dõi; không xác định danh tính hay mục đích của nó.",
+            "purpose": "Thể hiện ending chương, giữ điều chưa biết trong POV.",
+            "purpose_visibility": "writer_safe",
+            "writer_notes": [],
+            "author_only_notes": [],
+            "required_beats": [
+              "cùng nhận ra đang bị theo dõi"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "world_rule_ids": [],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          }
+        ],
+        "global_constraints": [
+          "Ngôn ngữ: vi; POV: Ngôi ba giới hạn theo Sở Dương; độ dài: Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng.",
+          "Không giải thích nguồn gốc cái nồi.",
+          "Không thêm major plot hoặc foreshadow ngoài sections."
+        ],
+        "writer_context_policy": {
+          "include_author_only": false,
+          "include_future_plan": false
+        }
+      }
+    },
+    {
+      "case_id": "skeleton_ch2_prepared_before_final",
+      "prompt_id": "skeleton.v1",
+      "request": {
+        "action": "generate",
+        "base_idea_constraints": [
+          "Giữ phản xạ cứu người.",
+          "Không giải thích nguồn gốc cái nồi."
+        ],
+        "premise_constraints": [
+          "Không reveal nguồn gốc cái nồi trong chương 1.",
+          "Không để Writer tự tạo major twist."
+        ],
+        "current_arc": {
+          "arc_id": "arc_0001",
+          "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+          "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+          "major_reveals": [
+            "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+          ],
+          "relationship_directions": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+              "target_state": "Miễn cưỡng tin nhau",
+              "notes": "Đây là plan tương lai, không phải current relationship."
+            }
+          ]
+        },
+        "chapter_plan": {
+          "chapter_id": "ch_0002",
+          "chapter_number": 2,
+          "title": "Ánh lửa dưới thung lũng",
+          "summary": "Sở Dương sống sót sau vách đá và chạm gần nguồn ánh lửa.",
+          "hook": "Có người ở gần nhưng anh không biết họ có cứu hay giết mình.",
+          "outline": [
+            {
+              "language": "vi",
+              "pov": "Ngôi ba giới hạn theo Sở Dương",
+              "length_guidance": "Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng"
+            },
+            "Thoát khỏi vách đá bằng phản xạ và cái nồi.",
+            "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+          ],
+          "character_ids": [
+            "char_0001",
+            "char_0002"
+          ],
+          "world_rule_ids": [
+            "rule_0001"
+          ],
+          "foreshadow_ids": [
+            "fs_0001"
+          ],
+          "threads": [
+            "Nguồn gốc cái nồi"
+          ],
+          "relationship_changes": [
+            {
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "arc_direction": "từ chưa gặp sang dè chừng",
+              "target_state": "Dè chừng lẫn nhau",
+              "notes": "Plan cho chapter 2, chưa phải current state."
+            }
+          ],
+          "chapter_goal": "Đưa quan hệ tương lai vào vùng va chạm.",
+          "planned_ending": "Hai người nhận ra cùng có thứ đang theo dõi."
+        },
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "previous_final_summary": null,
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Sở Dương",
+            "aliases": [
+              "Sở Đại Phu"
+            ],
+            "role": "protagonist",
+            "tier": "core",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Bác sĩ cấp cứu thời hiện đại, tỉnh dậy trong thân xác lạ.",
+              "traits": [
+                "điềm tĩnh khi khám bệnh",
+                "miệng tiện",
+                "cố chấp cứu người"
+              ],
+              "voice": "Mỉa mai ngắn, ưu tiên quan sát cụ thể.",
+              "known_history": "Chết trên đường vắng khi quay lại cứu người bị tai nạn."
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Giữ phản xạ kiểm tra triệu chứng và môi trường.",
+                "Có thể sợ nhưng không được suy diễn chắc chắn về thế giới mới."
+              ]
+            },
+            "author_only": {
+              "secret": "Thân xác nguyên chủ từng liên quan tới bí mật của cái nồi, chưa reveal."
+            },
+            "future_direction": {
+              "arc_0001": "Từ chỉ muốn sống qua đêm đầu sang chủ động cứu người trước mặt."
+            }
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Tiêu Như Ngọc",
+            "aliases": [],
+            "role": "ally_future",
+            "tier": "major",
+            "effective_from_chapter": 2,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Người giữ ánh lửa xa dưới thung lũng, sẽ xuất hiện trực tiếp từ chương 2.",
+              "traits": [
+                "thận trọng",
+                "giỏi quan sát"
+              ],
+              "voice": "Ít lời, hỏi thẳng.",
+              "known_history": ""
+            },
+            "writer_profile": {
+              "safe_notes": [
+                "Không xuất hiện trực tiếp trong chương 1."
+              ]
+            },
+            "author_only": {},
+            "future_direction": {
+              "arc_0001": "Từ nghi ngờ Sở Dương sang buộc phải hợp tác."
+            }
+          }
+        ],
+        "world_rules": [
+          {
+            "world_rule_id": "rule_0001",
+            "category": "Hệ thống",
+            "summary": "Giọng nói hệ thống chỉ phát câu lệnh cứng nhắc.",
+            "content": "Trong chương đầu, hệ thống chỉ có ba câu: chào ký chủ, thiếu nguyên liệu, bắt đầu thu thập nguyên liệu.",
+            "boundary": "Hệ thống không thương lượng, không giải thích, không bông đùa.",
+            "effective_from_chapter": 1,
+            "visibility": "writer_safe",
+            "writer_projection": "Hệ thống nói ngắn, lặp máy móc, không đối đáp.",
+            "author_only": {}
+          }
+        ],
+        "foreshadows": [
+          {
+            "foreshadow_id": "fs_0001",
+            "label": "Nguồn gốc cái nồi",
+            "truth_author_only": "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ.",
+            "planned_planting": [
+              {
+                "chapter_id": "ch_0001",
+                "surface_instruction": "Mô tả nồi rỉ xốp nhưng không móp khi gõ đá; không giải thích nguyên nhân.",
+                "visibility": "skeleton_only"
+              }
+            ],
+            "planned_payoff": null,
+            "effective_from_chapter": 1,
+            "writer_visibility": "skeleton_only",
+            "status": "active"
+          }
+        ],
+        "assigned_section_ids": [],
+        "previous_skeleton": null,
+        "user_instruction": "Triển khai đúng plan và actual đầu chương; hint không có lời giải.",
+        "context_basis": {
+          "mode": "provisional",
+          "actual_through_chapter": 0,
+          "planned_bridge": [
+            {
+              "chapter_id": "ch_0001",
+              "chapter_number": 1,
+              "summary": "Dự kiến Sở Dương bị kéo xuống vách đá cuối chương; hai người chưa gặp."
+            }
+          ]
+        }
+      },
+      "response": {
+        "chapter_id": "ch_0002",
+        "chapter_number": 2,
+        "sections": [
+          {
+            "section_id": "tmp_section_1",
+            "index": 1,
+            "type": "action",
+            "instruction": "Mở ở vách đá, triển khai Sở Dương thoát nhờ phản xạ cùng cái nồi.",
+            "purpose": "Triển khai sự kiện chương từ điều kiện đầu chương dự kiến, chưa xác nhận actual.",
+            "purpose_visibility": "planner_only",
+            "writer_notes": [],
+            "author_only_notes": [
+              "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ."
+            ],
+            "required_beats": [
+              "thoát vách đá bằng phản xạ và cái nồi"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001"
+            ],
+            "world_rule_ids": [
+              "rule_0001"
+            ],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          },
+          {
+            "section_id": "tmp_section_2",
+            "index": 2,
+            "type": "dialogue",
+            "instruction": "Cho Sở Dương lần theo động tĩnh gần ánh lửa, nghe rồi đối diện Tiêu Như Ngọc. Hai người hỏi ngắn để biết đối phương có nguy hiểm không; giữ khoảng cách và chưa hứa hợp tác.",
+            "purpose": "Chuyển từ chưa gặp sang dè chừng.",
+            "purpose_visibility": "writer_safe",
+            "writer_notes": [],
+            "author_only_notes": [],
+            "required_beats": [
+              "nghe động tĩnh",
+              "hỏi dò từ khoảng cách an toàn"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "world_rule_ids": [],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          },
+          {
+            "section_id": "tmp_section_3",
+            "index": 3,
+            "type": "ending",
+            "instruction": "Kết khi cả hai nhận ra dấu hiệu có thứ đang theo dõi; không xác định danh tính hay mục đích của nó.",
+            "purpose": "Thể hiện ending chương, giữ điều chưa biết trong POV.",
+            "purpose_visibility": "writer_safe",
+            "writer_notes": [],
+            "author_only_notes": [],
+            "required_beats": [
+              "cùng nhận ra đang bị theo dõi"
+            ],
+            "forbidden_moves": [
+              "Không giải thích nguồn gốc cái nồi.",
+              "Không cho hệ thống đối đáp."
+            ],
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "world_rule_ids": [],
+            "foreshadow_ids": [],
+            "foreshadow_surfaces": []
+          }
+        ],
+        "global_constraints": [
+          "Ngôn ngữ: vi; POV: Ngôi ba giới hạn theo Sở Dương; độ dài: Khoảng 1800–2400 từ, ưu tiên đủ nhịp hơn đếm từ cứng.",
+          "Không giải thích nguồn gốc cái nồi.",
+          "Không thêm major plot hoặc foreshadow ngoài sections."
+        ],
+        "writer_context_policy": {
+          "include_author_only": false,
+          "include_future_plan": false
+        }
+      }
+    }
+  ]
+}

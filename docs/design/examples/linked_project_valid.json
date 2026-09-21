@@ -1,0 +1,1091 @@
+{
+  "schema_version": 1,
+  "example_name": "two_chapter_project_with_secret_and_late_lore",
+  "project": {
+    "schema_version": 2,
+    "project_id": "proj_0001",
+    "title": "Nồi Canh Bên Đường",
+    "default_language": "vi",
+    "genre_prompt_id": "xianxia",
+    "writing_style_id": "default",
+    "current_chapter": 2,
+    "auto_accept_structured": false,
+    "allow_relationship_replan": true,
+    "rolling_plan_every": 3,
+    "created_at": "2026-09-19T09:00:00+07:00",
+    "updated_at": "2026-09-19T10:00:00+07:00"
+  },
+  "co_create": {
+    "schema_version": 1,
+    "status": "finalized",
+    "idea_state": {
+      "genre": "xianxia hài nhẹ",
+      "tone": "hồi hộp, tự nhiên, có mỉa mai khô",
+      "protagonist": "Sở Dương, bác sĩ cấp cứu",
+      "core_concept": "Bác sĩ chết vì cứu người rồi tỉnh dậy trong thân xác lạ với cái nồi sắt đen.",
+      "setting": "Sườn Vạn Linh sơn và Thương Ngô giới.",
+      "conflict": "Giữ quyền lựa chọn trong một thân thể bị hệ thống cưỡng chế.",
+      "constraints": [
+        "Không reveal nguồn gốc cái nồi ở chương 1.",
+        "Writer không nhận full foreshadow truth."
+      ],
+      "open_questions": []
+    },
+    "base_idea": {
+      "schema_version": 1,
+      "status": "accepted",
+      "revision": 1,
+      "markdown_ref": "base_idea.md",
+      "dependency_pins": [],
+      "accepted_at": "2026-09-19T09:05:00+07:00",
+      "accepted_by": "user"
+    }
+  },
+  "artifacts": {
+    "premise": {
+      "schema_version": 1,
+      "artifact_id": "premise",
+      "artifact_type": "premise",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "title": "Nồi Canh Bên Đường",
+          "logline": "Sở Dương, một bác sĩ cấp cứu, tỉnh dậy ở Thương Ngô giới với cái nồi sắt đen và một hệ thống không biết thương lượng.",
+          "dramatic_question": "Anh có giữ được nguyên tắc cứu người khi chính thân thể mình không còn hoàn toàn nghe lời không?",
+          "themes": [
+            "quyền lựa chọn",
+            "phản xạ nghề nghiệp",
+            "lòng tốt không màu mè"
+          ],
+          "tone_contract": [
+            "Tiếng Việt tự nhiên.",
+            "Hài nhẹ đến từ phản ứng của nhân vật, không phá hiểm nguy."
+          ],
+          "hard_constraints": [
+            "Không reveal nguồn gốc cái nồi trong chương 1.",
+            "Không để Writer tự tạo major twist."
+          ],
+          "non_goals": [
+            "Không xây hệ thống agent trong app."
+          ]
+        },
+        "payload_source": {
+          "source_type": "user",
+          "prompt_id": null,
+          "raw_output_ref": null
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "base_idea",
+            "revision": 1,
+            "scope": "base_idea"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:10:00+07:00",
+        "accepted_at": "2026-09-19T09:12:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "characters": {
+      "schema_version": 1,
+      "artifact_id": "characters",
+      "artifact_type": "characters",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "characters": [
+            {
+              "character_id": "char_0001",
+              "display_name": "Sở Dương",
+              "aliases": [
+                "Sở Đại Phu"
+              ],
+              "role": "protagonist",
+              "tier": "core",
+              "effective_from_chapter": 1,
+              "status": "accepted",
+              "public_profile": {
+                "description": "Bác sĩ cấp cứu thời hiện đại, tỉnh dậy trong thân xác lạ.",
+                "traits": [
+                  "điềm tĩnh khi khám bệnh",
+                  "miệng tiện",
+                  "cố chấp cứu người"
+                ],
+                "voice": "Mỉa mai ngắn, ưu tiên quan sát cụ thể.",
+                "known_history": "Chết trên đường vắng khi quay lại cứu người bị tai nạn."
+              },
+              "writer_profile": {
+                "safe_notes": [
+                  "Giữ phản xạ kiểm tra triệu chứng và môi trường.",
+                  "Có thể sợ nhưng không được suy diễn chắc chắn về thế giới mới."
+                ]
+              },
+              "author_only": {
+                "secret": "Thân xác nguyên chủ từng liên quan tới bí mật của cái nồi, chưa reveal."
+              },
+              "future_direction": {
+                "arc_0001": "Từ chỉ muốn sống qua đêm đầu sang chủ động cứu người trước mặt."
+              }
+            },
+            {
+              "character_id": "char_0002",
+              "display_name": "Tiêu Như Ngọc",
+              "aliases": [],
+              "role": "ally_future",
+              "tier": "major",
+              "effective_from_chapter": 2,
+              "status": "accepted",
+              "public_profile": {
+                "description": "Người giữ ánh lửa xa dưới thung lũng, sẽ xuất hiện trực tiếp từ chương 2.",
+                "traits": [
+                  "thận trọng",
+                  "giỏi quan sát"
+                ],
+                "voice": "Ít lời, hỏi thẳng.",
+                "known_history": ""
+              },
+              "writer_profile": {
+                "safe_notes": [
+                  "Không xuất hiện trực tiếp trong chương 1."
+                ]
+              },
+              "author_only": {},
+              "future_direction": {
+                "arc_0001": "Từ nghi ngờ Sở Dương sang buộc phải hợp tác."
+              }
+            }
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "architect.characters.v1",
+          "raw_output_ref": "raw/characters_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "base_idea",
+            "revision": 1,
+            "scope": "base_idea"
+          },
+          {
+            "artifact_id": "premise",
+            "revision": 1,
+            "scope": "premise"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:15:00+07:00",
+        "accepted_at": "2026-09-19T09:20:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "world_rules": {
+      "schema_version": 1,
+      "artifact_id": "world_rules",
+      "artifact_type": "world_rules",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "world_rules": [
+            {
+              "world_rule_id": "rule_0001",
+              "category": "Hệ thống",
+              "summary": "Giọng nói hệ thống chỉ phát câu lệnh cứng nhắc.",
+              "content": "Trong chương đầu, hệ thống chỉ có ba câu: chào ký chủ, thiếu nguyên liệu, bắt đầu thu thập nguyên liệu.",
+              "boundary": "Hệ thống không thương lượng, không giải thích, không bông đùa.",
+              "effective_from_chapter": 1,
+              "visibility": "writer_safe",
+              "writer_projection": "Hệ thống nói ngắn, lặp máy móc, không đối đáp.",
+              "author_only": {}
+            },
+            {
+              "world_rule_id": "rule_0100",
+              "category": "Cơ quan bí mật",
+              "summary": "Từ chương 100 mới tồn tại Cơ quan phòng chống tội phạm xuyên giới.",
+              "content": "Cơ quan này giám sát các vật phẩm xuyên giới.",
+              "boundary": "Không xuất hiện trong các chương 1-99.",
+              "effective_from_chapter": 100,
+              "visibility": "author_only",
+              "writer_projection": null,
+              "author_only": {
+                "reason": "Lore tương lai để test chống leak."
+              }
+            }
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "architect.world_rules.v1",
+          "raw_output_ref": "raw/world_rules_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "premise",
+            "revision": 1,
+            "scope": "premise"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:21:00+07:00",
+        "accepted_at": "2026-09-19T09:24:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "foreshadow": {
+      "schema_version": 1,
+      "artifact_id": "foreshadow",
+      "artifact_type": "foreshadow",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "foreshadows": [
+            {
+              "foreshadow_id": "fs_0001",
+              "label": "Nguồn gốc cái nồi",
+              "truth_author_only": "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người, liên quan tới thân xác nguyên chủ.",
+              "planned_planting": [
+                {
+                  "chapter_id": "ch_0001",
+                  "surface_instruction": "Mô tả nồi rỉ xốp nhưng không móp khi gõ đá; không giải thích nguyên nhân.",
+                  "visibility": "skeleton_only"
+                }
+              ],
+              "planned_payoff": {
+                "arc_id": "arc_0003",
+                "note": "Payoff sau khi người đọc đã quen với nồi như vật dụng hài."
+              },
+              "effective_from_chapter": 1,
+              "writer_visibility": "skeleton_only",
+              "status": "active"
+            }
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "architect.foreshadow.v1",
+          "raw_output_ref": "raw/foreshadow_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "premise",
+            "revision": 1,
+            "scope": "premise"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:25:00+07:00",
+        "accepted_at": "2026-09-19T09:27:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "long_plan": {
+      "schema_version": 1,
+      "artifact_id": "long_plan",
+      "artifact_type": "long_plan",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "volumes": [
+            {
+              "volume_id": "vol_0001",
+              "title": "Nồi Canh Bên Đường",
+              "theme": "Giữ quyền lựa chọn khi bị kéo vào một luật chơi lạ.",
+              "goal": "Đưa Sở Dương sống qua đêm đầu và hiểu giới hạn của hệ thống.",
+              "arcs": [
+                {
+                  "arc_id": "arc_0001",
+                  "title": "Đêm đầu trên Vạn Linh sơn",
+                  "chapter_range": {
+                    "start": 1,
+                    "end": 7
+                  },
+                  "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
+                  "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
+                  "start_state": "Tỉnh dậy đơn độc.",
+                  "end_state": "Hiểu một phần luật cưỡng chế và có đồng minh miễn cưỡng.",
+                  "major_reveals": [
+                    "Hệ thống có thể cưỡng chế thân thể nhưng không lấy được giọng nói."
+                  ],
+                  "character_ids": [
+                    "char_0001",
+                    "char_0002"
+                  ],
+                  "world_rule_ids": [
+                    "rule_0001"
+                  ],
+                  "foreshadow_ids": [
+                    "fs_0001"
+                  ],
+                  "relationship_directions": [
+                    {
+                      "relationship_id": "rel_0001",
+                      "character_ids": [
+                        "char_0001",
+                        "char_0002"
+                      ],
+                      "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
+                      "target_state": "Miễn cưỡng tin nhau",
+                      "notes": "Đây là plan tương lai, không phải current relationship."
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "global_threads": [
+            {
+              "thread_id": "thread_0001",
+              "label": "Nguồn gốc cái nồi",
+              "foreshadow_id": "fs_0001"
+            }
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "long_plan.v1",
+          "raw_output_ref": "raw/long_plan_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "premise",
+            "revision": 1,
+            "scope": "premise"
+          },
+          {
+            "artifact_id": "characters",
+            "revision": 1,
+            "scope": "characters"
+          },
+          {
+            "artifact_id": "world_rules",
+            "revision": 1,
+            "scope": "world_rules"
+          },
+          {
+            "artifact_id": "foreshadow",
+            "revision": 1,
+            "scope": "foreshadow"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:30:00+07:00",
+        "accepted_at": "2026-09-19T09:35:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "short_plan": {
+      "schema_version": 1,
+      "artifact_id": "short_plan",
+      "artifact_type": "short_plan",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "arc_id": "arc_0001",
+          "chapters": [
+            {
+              "chapter_id": "ch_0001",
+              "chapter_number": 1,
+              "title": "Đường vắng",
+              "summary": "Sở Dương chết khi cứu người rồi tỉnh dậy bên cái nồi sắt đen.",
+              "hook": "Thân thể tự bước lên sống núi trong bóng tối.",
+              "outline": [
+                "Cấp cứu trên đường vắng và cái chết.",
+                "Tỉnh dậy trên sườn núi trong thân xác lạ.",
+                "Giọng nói cứng nhắc báo thiếu nguyên liệu.",
+                "Thân thể bị cưỡng chế đi ngược hướng ánh lửa."
+              ],
+              "character_ids": [
+                "char_0001"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "thread_0001"
+              ],
+              "relationship_changes": [],
+              "chapter_goal": "Thiết lập phản xạ cứu người và nỗi sợ thân thể không nghe mình.",
+              "planned_ending": "Sở Dương bị thân thể kéo xuống vách đá."
+            },
+            {
+              "chapter_id": "ch_0002",
+              "chapter_number": 2,
+              "title": "Ánh lửa dưới thung lũng",
+              "summary": "Sở Dương sống sót sau vách đá và chạm gần nguồn ánh lửa.",
+              "hook": "Có người ở gần nhưng anh không biết họ có cứu hay giết mình.",
+              "outline": [
+                "Thoát khỏi vách đá bằng phản xạ và cái nồi.",
+                "Lần đầu nghe động tĩnh của Tiêu Như Ngọc."
+              ],
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "threads": [
+                "thread_0001"
+              ],
+              "relationship_changes": [
+                {
+                  "relationship_id": "rel_0001",
+                  "character_ids": [
+                    "char_0001",
+                    "char_0002"
+                  ],
+                  "arc_direction": "từ chưa gặp sang dè chừng",
+                  "target_state": "Dè chừng lẫn nhau",
+                  "notes": "Plan cho chapter 2, chưa phải current state."
+                }
+              ],
+              "chapter_goal": "Đưa quan hệ tương lai vào vùng va chạm.",
+              "planned_ending": "Hai người nhận ra cùng có thứ đang theo dõi."
+            }
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "short_plan.v1",
+          "raw_output_ref": "raw/short_plan_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "long_plan",
+            "revision": 1,
+            "scope": "long_plan"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:36:00+07:00",
+        "accepted_at": "2026-09-19T09:40:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "skeleton_ch_0001": {
+      "schema_version": 1,
+      "artifact_id": "skeleton_ch_0001",
+      "artifact_type": "skeleton",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "chapter_id": "ch_0001",
+          "chapter_number": 1,
+          "global_constraints": [
+            "Không để Tiêu Như Ngọc xuất hiện trực tiếp.",
+            "Không giải thích nguồn gốc cái nồi."
+          ],
+          "writer_context_policy": {
+            "include_author_only": false,
+            "include_future_plan": false
+          },
+          "sections": [
+            {
+              "section_id": "section_0001",
+              "index": 1,
+              "type": "action",
+              "instruction": "Viết cảnh Sở Dương cấp cứu người bị tai nạn trên đường vắng và chết vì quay lại cứu người.",
+              "purpose": "Chứng minh Base Idea: phản xạ cứu người thắng phản xạ tự cứu.",
+              "purpose_visibility": "writer_safe",
+              "writer_notes": [
+                "Cụ thể hóa thao tác cấp cứu, không hô khẩu hiệu."
+              ],
+              "author_only_notes": [],
+              "required_beats": [
+                "ép tim ngoài lồng ngực",
+                "đèn xe tải",
+                "quay lại kéo người bệnh"
+              ],
+              "forbidden_moves": [
+                "Không viết cảnh chết thành kinh dị máu me."
+              ],
+              "character_ids": [
+                "char_0001"
+              ],
+              "world_rule_ids": [],
+              "foreshadow_ids": [],
+              "foreshadow_surfaces": []
+            },
+            {
+              "section_id": "section_0002",
+              "index": 2,
+              "type": "foreshadow",
+              "instruction": "Mô tả cái nồi sắt đen rỉ xốp nhưng không móp khi bị gõ bằng đá.",
+              "purpose": "Gieo mầm vật phẩm có nguồn gốc bất thường mà chưa reveal.",
+              "purpose_visibility": "planner_only",
+              "writer_notes": [
+                "Chỉ mô tả hiện tượng vật lý và phản ứng nghi ngờ của Sở Dương."
+              ],
+              "author_only_notes": [
+                "Không gửi truth_author_only của fs_0001 cho Writer."
+              ],
+              "required_beats": [
+                "nồi rỉ xốp như bùn khô",
+                "không móp khi gõ đá"
+              ],
+              "forbidden_moves": [
+                "Không giải thích nguồn gốc cái nồi.",
+                "Không để hệ thống đối đáp."
+              ],
+              "character_ids": [
+                "char_0001"
+              ],
+              "world_rule_ids": [
+                "rule_0001"
+              ],
+              "foreshadow_ids": [
+                "fs_0001"
+              ],
+              "foreshadow_surfaces": [
+                {
+                  "foreshadow_id": "fs_0001",
+                  "surface_instruction": "Cái nồi có vẻ rỉ nhưng cứng bất thường; chỉ mô tả, không lý giải.",
+                  "reveal_policy": "hint_only"
+                }
+              ]
+            }
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "skeleton.v1",
+          "raw_output_ref": "raw/skeleton_ch_0001_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "short_plan",
+            "revision": 1,
+            "scope": "short_plan",
+            "chapter_id": "ch_0001"
+          },
+          {
+            "artifact_id": "foreshadow",
+            "revision": 1,
+            "scope": "foreshadow"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:41:00+07:00",
+        "accepted_at": "2026-09-19T09:45:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "review_report_ch_0001": {
+      "schema_version": 1,
+      "artifact_id": "review_report_ch_0001",
+      "artifact_type": "review_report",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "chapter_id": "ch_0001",
+          "prose_revision": 2,
+          "summary": "Không có blocking issue; có một cảnh báo style nhỏ.",
+          "issues": [
+            {
+              "issue_id": "issue_0001",
+              "severity": "minor",
+              "category": "style_issue",
+              "source": {
+                "authority_kind": "skeleton",
+                "artifact_id": "skeleton_ch_0001",
+                "revision": 1,
+                "field_path": "/sections/0/writer_notes/0"
+              },
+              "evidence": {
+                "prose_revision": 2,
+                "quote": "Anh tự nhủ mình thật cao cả.",
+                "section_id": "section_0001"
+              },
+              "message": "Câu này dán nhãn đạo đức trực tiếp, nên sửa thành hành động cụ thể.",
+              "suggested_action": "Thay bằng phản xạ kéo người bệnh và tiếng phanh.",
+              "status": "resolved_in_revision"
+            }
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "review.v1",
+          "raw_output_ref": "raw/review_ch_0001_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "skeleton_ch_0001",
+            "revision": 1,
+            "scope": "skeleton"
+          },
+          {
+            "artifact_id": "chapter_ch_0001",
+            "revision": 2,
+            "scope": "prose_revision"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:52:00+07:00",
+        "accepted_at": "2026-09-19T09:53:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "reconciliation_ch_0001": {
+      "schema_version": 1,
+      "artifact_id": "reconciliation_ch_0001",
+      "artifact_type": "reconciliation",
+      "status": "accepted",
+      "accepted_revision": {
+        "revision": 1,
+        "payload": {
+          "chapter_id": "ch_0001",
+          "chapter_number": 1,
+          "source_final_candidate": {
+            "prose_revision": 2,
+            "markdown_ref": "chapter_0001_final.md"
+          },
+          "timeline": {
+            "time": "Đêm đầu sau khi tỉnh dậy",
+            "location": "Sườn Vạn Linh sơn",
+            "status": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi."
+          },
+          "relationship_updates": [
+            {
+              "relationship_id": "rel_0001",
+              "character_ids": [
+                "char_0001",
+                "char_0002"
+              ],
+              "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu."
+            }
+          ],
+          "notes": [
+            "Không trích xuất nguồn gốc cái nồi thành world rule mới."
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "reconcile.v1",
+          "raw_output_ref": "raw/reconcile_ch_0001_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "chapter_ch_0001",
+            "revision": 2,
+            "scope": "prose_revision"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T09:58:00+07:00",
+        "accepted_at": "2026-09-19T10:00:00+07:00",
+        "accepted_by": "user"
+      },
+      "candidate_revision": null,
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "rolling_patch_arc_0001": {
+      "schema_version": 1,
+      "artifact_id": "rolling_patch_arc_0001",
+      "artifact_type": "rolling_patch",
+      "status": "draft",
+      "accepted_revision": null,
+      "candidate_revision": {
+        "revision": 1,
+        "payload": {
+          "status": "ok",
+          "reviewed_chapter_range": {
+            "start": 1,
+            "end": 1
+          },
+          "deviations": [],
+          "short_plan_changes": [],
+          "relationship_plan_changes": [],
+          "blocked_by_authority": []
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "rolling_plan.v1",
+          "raw_output_ref": "raw/rolling_arc_0001_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "short_plan",
+            "revision": 1,
+            "scope": "short_plan"
+          },
+          {
+            "artifact_id": "current_timeline",
+            "revision": 1,
+            "scope": "timeline_as_of"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T10:02:00+07:00",
+        "accepted_at": null,
+        "accepted_by": null
+      },
+      "stale_reasons": [],
+      "history_refs": []
+    },
+    "impact_report_ch_0001_retcon": {
+      "schema_version": 1,
+      "artifact_id": "impact_report_ch_0001_retcon",
+      "artifact_type": "impact_report",
+      "status": "draft",
+      "accepted_revision": null,
+      "candidate_revision": {
+        "revision": 1,
+        "payload": {
+          "source_change": {
+            "item_kind": "chapter_final",
+            "item_id": "ch_0001",
+            "from_revision": 1,
+            "to_candidate_revision": 3
+          },
+          "affected_items": [
+            {
+              "item_kind": "skeleton",
+              "item_id": "skeleton_ch_0002",
+              "reason": "Retcon có thể đổi trạng thái thân thể trước chương 2.",
+              "severity": "major",
+              "suggested_action": "Review hoặc regenerate Skeleton chương 2."
+            }
+          ],
+          "risk_summary": "Không rewrite chương 2; chỉ cần đánh dấu stale các artifact phụ thuộc.",
+          "suggested_actions": [
+            "Reaccept Short Plan nếu hướng arc không đổi.",
+            "Regenerate Skeleton chương 2 nếu chi tiết thân thể thay đổi."
+          ]
+        },
+        "payload_source": {
+          "source_type": "llm",
+          "prompt_id": "retcon_impact.v1",
+          "raw_output_ref": "raw/impact_ch_0001_run_0001.json"
+        },
+        "dependency_pins": [
+          {
+            "artifact_id": "chapter_ch_0001",
+            "revision": 3,
+            "scope": "prose_revision"
+          }
+        ],
+        "validation": {
+          "state": "valid",
+          "errors": []
+        },
+        "created_at": "2026-09-19T10:05:00+07:00",
+        "accepted_at": null,
+        "accepted_by": null
+      },
+      "stale_reasons": [],
+      "history_refs": []
+    }
+  },
+  "chapters": {
+    "ch_0001": {
+      "schema_version": 1,
+      "chapter_id": "ch_0001",
+      "chapter_number": 1,
+      "title": "Đường vắng",
+      "status": "final_reconciled",
+      "previous_chapter_id": null,
+      "short_plan_pin": {
+        "artifact_id": "short_plan",
+        "revision": 1,
+        "scope": "short_plan",
+        "chapter_id": "ch_0001"
+      },
+      "skeleton_pin": {
+        "artifact_id": "skeleton_ch_0001",
+        "revision": 1,
+        "scope": "skeleton",
+        "chapter_id": "ch_0001"
+      },
+      "drafts": [
+        {
+          "revision": 1,
+          "markdown_ref": "chapter_0001_draft_r1.md",
+          "source_type": "llm",
+          "is_complete": true,
+          "created_at": "2026-09-19T09:48:00+07:00",
+          "dependency_pins": [
+            {
+              "artifact_id": "skeleton_ch_0001",
+              "revision": 1,
+              "scope": "skeleton"
+            }
+          ]
+        },
+        {
+          "revision": 2,
+          "markdown_ref": "chapter_0001_final.md",
+          "source_type": "user",
+          "is_complete": true,
+          "created_at": "2026-09-19T09:55:00+07:00",
+          "dependency_pins": [
+            {
+              "artifact_id": "skeleton_ch_0001",
+              "revision": 1,
+              "scope": "skeleton"
+            }
+          ]
+        }
+      ],
+      "current_draft_revision": 2,
+      "human_review": {
+        "prose_revision": 2,
+        "reviewed_at": "2026-09-19T09:56:00+07:00",
+        "reviewed_by": "user",
+        "notes": "Đã sửa câu dán nhãn đạo đức.",
+        "valid_for_current_revision": true
+      },
+      "ai_review_reports": [
+        {
+          "artifact_id": "review_report_ch_0001",
+          "revision": 1,
+          "prose_revision": 2
+        }
+      ],
+      "final_candidate": null,
+      "final_revision": {
+        "revision": 1,
+        "source_prose_revision": 2,
+        "markdown_ref": "chapter_0001_final.md",
+        "reconciled_at": "2026-09-19T10:00:00+07:00"
+      },
+      "reconciliation_pin": {
+        "artifact_id": "reconciliation_ch_0001",
+        "revision": 1,
+        "scope": "reconciliation",
+        "chapter_id": "ch_0001"
+      }
+    },
+    "ch_0002": {
+      "schema_version": 1,
+      "chapter_id": "ch_0002",
+      "chapter_number": 2,
+      "title": "Ánh lửa dưới thung lũng",
+      "status": "planned",
+      "previous_chapter_id": "ch_0001",
+      "short_plan_pin": {
+        "artifact_id": "short_plan",
+        "revision": 1,
+        "scope": "short_plan",
+        "chapter_id": "ch_0002"
+      },
+      "skeleton_pin": null,
+      "drafts": [],
+      "current_draft_revision": null,
+      "human_review": null,
+      "ai_review_reports": [],
+      "final_candidate": null,
+      "final_revision": null,
+      "reconciliation_pin": null
+    }
+  },
+  "state": {
+    "current_timeline": {
+      "schema_version": 1,
+      "latest_final_chapter": 1,
+      "entries": [
+        {
+          "timeline_id": "timeline_0001",
+          "chapter_id": "ch_0001",
+          "chapter_number": 1,
+          "time": "Đêm đầu sau khi tỉnh dậy",
+          "location": "Sườn Vạn Linh sơn",
+          "status": "Sở Dương tỉnh dậy trong thân xác lạ bên cái nồi sắt đen, nghe hệ thống báo thiếu nguyên liệu và bị thân thể cưỡng chế đi lên sống núi.",
+          "source_final_revision": {
+            "chapter_id": "ch_0001",
+            "revision": 1
+          },
+          "accepted_at": "2026-09-19T10:00:00+07:00"
+        }
+      ]
+    },
+    "relationships": {
+      "schema_version": 1,
+      "relationships": [
+        {
+          "relationship_id": "rel_0001",
+          "character_ids": [
+            "char_0001",
+            "char_0002"
+          ],
+          "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+          "last_updated_chapter": 1,
+          "history": [
+            {
+              "chapter_id": "ch_0001",
+              "chapter_number": 1,
+              "current": "Chưa gặp trực tiếp; chỉ có ánh lửa xa làm dấu hiệu.",
+              "source_final_revision": 1
+            }
+          ]
+        }
+      ]
+    },
+    "snapshots": [
+      {
+        "snapshot_id": "snapshot_0001",
+        "for_chapter_id": "ch_0001",
+        "for_chapter_number": 1,
+        "created_from_action": "generate_skeleton",
+        "dependency_pins": [
+          {
+            "artifact_id": "characters",
+            "revision": 1,
+            "scope": "characters"
+          },
+          {
+            "artifact_id": "world_rules",
+            "revision": 1,
+            "scope": "world_rules"
+          },
+          {
+            "artifact_id": "foreshadow",
+            "revision": 1,
+            "scope": "foreshadow"
+          }
+        ],
+        "timeline_entry_ids": [],
+        "relationship_versions": [],
+        "effective_character_ids": [
+          "char_0001"
+        ],
+        "effective_world_rule_ids": [
+          "rule_0001"
+        ],
+        "effective_foreshadow_ids": [
+          "fs_0001"
+        ],
+        "excluded_due_to_effective_chapter": [
+          {
+            "item_kind": "character",
+            "item_id": "char_0002",
+            "effective_from_chapter": 2
+          },
+          {
+            "item_kind": "world_rule",
+            "item_id": "rule_0100",
+            "effective_from_chapter": 100
+          }
+        ],
+        "writer_projection_hash": "example-only-no-hash"
+      }
+    ]
+  },
+  "rewrite_section_example": {
+    "request": {
+      "chapter_id": "ch_0001",
+      "prose_revision": 2,
+      "section_id": "section_0001",
+      "selected_text": "Anh tự nhủ mình thật cao cả.",
+      "instruction": "Thay câu dán nhãn đạo đức bằng hành động cụ thể.",
+      "constraints": [
+        "Không đổi sự kiện.",
+        "Không thêm nhân vật mới."
+      ],
+      "context_pins": [
+        {
+          "artifact_id": "skeleton_ch_0001",
+          "revision": 1,
+          "scope": "skeleton"
+        }
+      ]
+    },
+    "payload": {
+      "replacement_markdown": "Anh không kịp nghĩ gì to tát; tay đã vòng qua nách người bệnh trước khi tiếng phanh xé ngang mặt đường.",
+      "notes": [
+        "Giữ intent cũ."
+      ],
+      "changed_intent": false
+    }
+  },
+  "structured_output_error_example": {
+    "error_id": "err_0001",
+    "artifact_id": "reconciliation_ch_0001",
+    "candidate_revision": 2,
+    "raw_output_ref": "raw/reconcile_ch_0001_invalid.json",
+    "errors": [
+      {
+        "path": "/payload/chapter_number",
+        "code": "chapter_mismatch",
+        "message": "Expected chapter_number 1, got 2.",
+        "severity": "blocking"
+      }
+    ],
+    "created_at": "2026-09-19T10:06:00+07:00",
+    "retryable": true
+  },
+  "validation_notes": [
+    "rule_0100 is accepted but excluded from chapter 1 snapshot because effective_from_chapter is 100.",
+    "fs_0001 truth_author_only is not present in the skeleton surface instruction sent to Writer.",
+    "rel_0001 current state lives in state.relationships; future direction lives in long/short plan."
+  ]
+}

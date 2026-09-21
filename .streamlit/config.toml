@@ -1,0 +1,10 @@
+# Cấu hình Streamlit của Manual AI Novel.
+#
+# `novel_ai/pages/` là **workspace module** của router T19 (mỗi module có
+# `render(ctx)`), không phải multipage app của Streamlit. Streamlit vẫn tự phát
+# hiện thư mục `pages/` cạnh entry script và dựng nav riêng trong sidebar; nav đó
+# trùng với sidebar Project của shell và làm sai bố cục spec mục 28, nên tắt hẳn.
+#
+# Sidebar của app chỉ còn: chọn/tạo project + kiểm tra kết nối LLM.
+[client]
+showSidebarNavigation = false

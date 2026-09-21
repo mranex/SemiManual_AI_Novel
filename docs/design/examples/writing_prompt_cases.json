@@ -1,0 +1,713 @@
+{
+  "description": "Fixture biên soạn offline T06, không phải response LLM; các ca là nhánh riêng, Writer draft khác final đã edit.",
+  "excluded_source_material": {
+    "author_only": {
+      "secret": "Bình tráo thư theo lệnh bà chủ trọ."
+    },
+    "future_rule": {
+      "world_rule_id": "rule_0100",
+      "effective_from_chapter": 100,
+      "content": "Hội gương bạc đọc ký ức trong giấy."
+    }
+  },
+  "cases": [
+    {
+      "case_id": "writer_ch1",
+      "prompt_id": "writer.v1",
+      "request": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 1,
+        "title": "Hai nếp keo",
+        "base_idea_constraints": [
+          "Không giải quyết bí ẩn bằng năng lực siêu nhiên."
+        ],
+        "premise_constraints": [
+          "Giữ giới hạn hiểu biết theo An."
+        ],
+        "skeleton": {
+          "sections": [
+            {
+              "section_id": "section_0001",
+              "instruction": "An đặt phong thư lên bàn. Cô nhận ra mép keo có hai nếp, cất thư khi nghe tiếng gõ cửa; chưa mở cửa.",
+              "writer_notes": [
+                "Ngôi ba giới hạn theo An; nhịp chậm."
+              ],
+              "required_beats": [
+                "Nhìn thấy hai nếp keo",
+                "Cất thư trước tiếng gõ tiếp theo"
+              ],
+              "forbidden_moves": [
+                "Không giải thích nguyên nhân nếp keo",
+                "Không cho người ngoài cửa xuất hiện",
+                "Giữ phong thư đóng."
+              ],
+              "foreshadow_surfaces": [
+                "Mép keo có hai nếp, chỉ tả điều nhìn thấy."
+              ]
+            }
+          ],
+          "global_constraints": [
+            "Ngôn ngữ: tiếng Việt.",
+            "POV: ngôi ba giới hạn theo An.",
+            "Độ dài: khoảng 100–150 từ cho cảnh mẫu."
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "public_profile": {
+              "voice": "Nói ngắn, dè chừng."
+            },
+            "writer_profile": {
+              "behavior_notes": [
+                "Giữ đồ vật gần mình."
+              ]
+            }
+          }
+        ],
+        "world_rules": [],
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "previous_final_summary": null,
+        "style": "# Văn phong mặc định v1\n\nHướng dẫn thể hiện cho Writer/Rewrite; Review có thể đối chiếu. Nhường yêu cầu tác giả và mọi constraint accepted. Không thay Skeleton, thiết kế plot, thêm manh mối hoặc ép thể loại.\n\n- Dùng động từ rõ chủ thể, chi tiết cảm giác được POV nhận biết. Chọn chi tiết phục vụ cảnh, không liệt kê giác quan theo công thức.\n- Giọng thoại theo profile, vị thế và mục đích của từng người. Cho lời đáp có phản ứng, khoảng lặng khi có ý nghĩa; không bắt mọi câu đều cụt hoặc mọi người đều né tránh.\n- Cảnh quan trọng có hành động và phản ứng đủ sức nặng; chuyển cảnh gọn nhưng không bỏ mất nguyên nhân. Nhịp câu theo nhịp cảnh, không áp tỷ lệ câu dài/ngắn.\n- Tránh hình ảnh sáo, cấu trúc đối xứng và lời bình chủ đề lặp. Có thể kể trực tiếp để nối thời gian; không biến “thể hiện” thành cấm tuyệt đối mọi câu gọi tên cảm xúc.\n- Giữ định dạng thoại nhất quán, đổi đoạn khi đổi người nói. Không biến section Skeleton thành danh sách hay đề mục kỹ thuật trong truyện.\n- Kết ở tình thế Skeleton yêu cầu. Không cần ép câu triết lý, cliffhanger hoặc một bí ẩn mới vào cuối mỗi chương.\n\nKhông có nguồn bổ sung phải đọc hoặc trạng thái phải tự lưu. Đây là guidance ngôn ngữ, không phải bộ kiểm tra tự động hay điều kiện finalize.\n",
+        "user_instruction": "Viết cảnh mẫu theo Skeleton."
+      },
+      "response": "An đặt phong thư xuống bàn, miết ngón tay dọc mép giấy. Dưới ngọn đèn, đường keo hiện thành hai nếp mảnh. Cô nghiêng thư lại gần ánh sáng, nhưng bóng ngón tay che khuất mép giấy. An đổi tay cầm. Hai nếp vẫn còn đó.\n\nCửa vang lên một tiếng gõ. Cô đặt thư xuống, nhìn sang cánh cửa rồi luồn phong thư vào ngăn kéo. Gỗ cọ vào giấy nghe khô và nhẹ. Khi tiếng gõ thứ hai cất lên, tay An vẫn giữ trên núm gỗ. Cô không đứng dậy."
+    },
+    {
+      "case_id": "writer_ch2",
+      "prompt_id": "writer.v1",
+      "request": {
+        "chapter_id": "ch_0002",
+        "chapter_number": 2,
+        "title": "Ngoài cửa",
+        "base_idea_constraints": [
+          "Không giải quyết bí ẩn bằng năng lực siêu nhiên."
+        ],
+        "premise_constraints": [
+          "Giữ giới hạn hiểu biết theo An."
+        ],
+        "skeleton": {
+          "global_constraints": [
+            "Ngôn ngữ: tiếng Việt.",
+            "POV: ngôi ba giới hạn theo An.",
+            "Độ dài: khoảng 50–100 từ cho cảnh mẫu."
+          ],
+          "sections": [
+            {
+              "section_id": "section_0002",
+              "instruction": "An mở cửa cho Bình, nhận giúp đỡ chuyển chiếc bàn chắn lối; cả hai vẫn dè chừng. Thư còn trong ngăn kéo.",
+              "writer_notes": [],
+              "required_beats": [
+                "Cùng dịch bàn",
+                "Giữ khoảng cách sau khi giúp"
+              ],
+              "forbidden_moves": [
+                "Không mở thư",
+                "Không biến thành tin tưởng tuyệt đối"
+              ],
+              "foreshadow_surfaces": []
+            }
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "public_profile": {
+              "voice": "Nói ngắn, dè chừng."
+            },
+            "writer_profile": {
+              "behavior_notes": [
+                "Giữ đồ vật gần mình."
+              ]
+            }
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Bình",
+            "public_profile": {
+              "voice": "Nhẹ, ngắn."
+            },
+            "writer_profile": {}
+          }
+        ],
+        "world_rules": [],
+        "timeline_as_of": [
+          {
+            "timeline_id": "timeline_0001",
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "time": "Đêm ấy",
+            "location": "Phòng trọ",
+            "status": "An cất phong thư vào ngăn kéo và ngồi yên khi nghe tiếng gõ bên ngoài.",
+            "source_final_revision": 2,
+            "accepted_at": "2026-09-20T10:00:00+07:00"
+          }
+        ],
+        "relationships_as_of": [],
+        "previous_final_summary": {
+          "chapter_id": "ch_0001",
+          "chapter_number": 1,
+          "summary": "An cất phong thư vào ngăn kéo và ngồi yên khi nghe tiếng gõ bên ngoài."
+        },
+        "style": "# Văn phong mặc định v1\n\nHướng dẫn thể hiện cho Writer/Rewrite; Review có thể đối chiếu. Nhường yêu cầu tác giả và mọi constraint accepted. Không thay Skeleton, thiết kế plot, thêm manh mối hoặc ép thể loại.\n\n- Dùng động từ rõ chủ thể, chi tiết cảm giác được POV nhận biết. Chọn chi tiết phục vụ cảnh, không liệt kê giác quan theo công thức.\n- Giọng thoại theo profile, vị thế và mục đích của từng người. Cho lời đáp có phản ứng, khoảng lặng khi có ý nghĩa; không bắt mọi câu đều cụt hoặc mọi người đều né tránh.\n- Cảnh quan trọng có hành động và phản ứng đủ sức nặng; chuyển cảnh gọn nhưng không bỏ mất nguyên nhân. Nhịp câu theo nhịp cảnh, không áp tỷ lệ câu dài/ngắn.\n- Tránh hình ảnh sáo, cấu trúc đối xứng và lời bình chủ đề lặp. Có thể kể trực tiếp để nối thời gian; không biến “thể hiện” thành cấm tuyệt đối mọi câu gọi tên cảm xúc.\n- Giữ định dạng thoại nhất quán, đổi đoạn khi đổi người nói. Không biến section Skeleton thành danh sách hay đề mục kỹ thuật trong truyện.\n- Kết ở tình thế Skeleton yêu cầu. Không cần ép câu triết lý, cliffhanger hoặc một bí ẩn mới vào cuối mỗi chương.\n\nKhông có nguồn bổ sung phải đọc hoặc trạng thái phải tự lưu. Đây là guidance ngôn ngữ, không phải bộ kiểm tra tự động hay điều kiện finalize.\n",
+        "user_instruction": "Viết cảnh mẫu theo Skeleton."
+      },
+      "response": "Sáng hôm sau, An mở cửa phòng trọ cho Bình. Cô giữ tay trên cánh cửa khi anh nhìn chiếc bàn chắn lối.\n\n“Nhấc bên ấy giúp tôi.”\n\nBình đỡ một đầu bàn. Họ cùng dịch nó sát tường; phong thư vẫn nằm trong ngăn kéo. An gật đầu cảm ơn rồi lùi lại. Bình đứng nguyên cạnh cửa, không hỏi về phong thư. Cả hai chỉ nói với nhau vài lời, đủ để tránh va chân vào bàn."
+    },
+    {
+      "case_id": "review_conflict",
+      "prompt_id": "review.v1",
+      "request": {
+        "chapter_id": "ch_0001",
+        "prose_revision": 1,
+        "prose_markdown": "An xé thư, đọc hết lời thú nhận.",
+        "constraint_sources": [
+          {
+            "authority_kind": "skeleton",
+            "artifact_id": "skeleton_ch_0001",
+            "revision": 1,
+            "field_path": "sections[0].forbidden_moves",
+            "content": [
+              "Không giải thích nguyên nhân nếp keo",
+              "Không cho người ngoài cửa xuất hiện",
+              "Giữ phong thư đóng."
+            ]
+          }
+        ],
+        "skeleton": {
+          "sections": [
+            {
+              "section_id": "section_0001",
+              "instruction": "An đặt phong thư lên bàn. Cô nhận ra mép keo có hai nếp, cất thư khi nghe tiếng gõ cửa; chưa mở cửa.",
+              "writer_notes": [
+                "Ngôi ba giới hạn theo An; nhịp chậm."
+              ],
+              "required_beats": [
+                "Nhìn thấy hai nếp keo",
+                "Cất thư trước tiếng gõ tiếp theo"
+              ],
+              "forbidden_moves": [
+                "Không giải thích nguyên nhân nếp keo",
+                "Không cho người ngoài cửa xuất hiện",
+                "Giữ phong thư đóng."
+              ],
+              "foreshadow_surfaces": [
+                "Mép keo có hai nếp, chỉ tả điều nhìn thấy."
+              ]
+            }
+          ],
+          "global_constraints": [
+            "Ngôn ngữ: tiếng Việt.",
+            "POV: ngôi ba giới hạn theo An.",
+            "Độ dài: khoảng 100–150 từ cho cảnh mẫu."
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "public_profile": {
+              "voice": "Nói ngắn, dè chừng."
+            },
+            "writer_profile": {
+              "behavior_notes": [
+                "Giữ đồ vật gần mình."
+              ]
+            }
+          }
+        ],
+        "world_rules": [],
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "previous_final_summary": null,
+        "style": "# Văn phong mặc định v1\n\nHướng dẫn thể hiện cho Writer/Rewrite; Review có thể đối chiếu. Nhường yêu cầu tác giả và mọi constraint accepted. Không thay Skeleton, thiết kế plot, thêm manh mối hoặc ép thể loại.\n\n- Dùng động từ rõ chủ thể, chi tiết cảm giác được POV nhận biết. Chọn chi tiết phục vụ cảnh, không liệt kê giác quan theo công thức.\n- Giọng thoại theo profile, vị thế và mục đích của từng người. Cho lời đáp có phản ứng, khoảng lặng khi có ý nghĩa; không bắt mọi câu đều cụt hoặc mọi người đều né tránh.\n- Cảnh quan trọng có hành động và phản ứng đủ sức nặng; chuyển cảnh gọn nhưng không bỏ mất nguyên nhân. Nhịp câu theo nhịp cảnh, không áp tỷ lệ câu dài/ngắn.\n- Tránh hình ảnh sáo, cấu trúc đối xứng và lời bình chủ đề lặp. Có thể kể trực tiếp để nối thời gian; không biến “thể hiện” thành cấm tuyệt đối mọi câu gọi tên cảm xúc.\n- Giữ định dạng thoại nhất quán, đổi đoạn khi đổi người nói. Không biến section Skeleton thành danh sách hay đề mục kỹ thuật trong truyện.\n- Kết ở tình thế Skeleton yêu cầu. Không cần ép câu triết lý, cliffhanger hoặc một bí ẩn mới vào cuối mỗi chương.\n\nKhông có nguồn bổ sung phải đọc hoặc trạng thái phải tự lưu. Đây là guidance ngôn ngữ, không phải bộ kiểm tra tự động hay điều kiện finalize.\n",
+        "review_focus": "Kiểm tra hành động mở thư."
+      },
+      "response": {
+        "chapter_id": "ch_0001",
+        "prose_revision": 1,
+        "issues": [
+          {
+            "issue_id": "issue_0001",
+            "severity": "blocking",
+            "category": "skeleton_deviation",
+            "source": {
+              "authority_kind": "skeleton",
+              "artifact_id": "skeleton_ch_0001",
+              "revision": 1,
+              "field_path": "sections[0].forbidden_moves"
+            },
+            "evidence": {
+              "prose_revision": 1,
+              "quote": "An xé thư, đọc hết lời thú nhận."
+            },
+            "message": "Draft mở và đọc thư trong khi Skeleton yêu cầu giữ thư đóng.",
+            "suggested_action": "Sửa đoạn mở thư để giữ hành động trong giới hạn Skeleton.",
+            "status": "open"
+          }
+        ],
+        "summary": "Có một deviation rõ ở hành động mở thư; người dùng cần review prose revision 1."
+      }
+    },
+    {
+      "case_id": "review_no_issue",
+      "prompt_id": "review.v1",
+      "request": {
+        "chapter_id": "ch_0001",
+        "prose_revision": 1,
+        "prose_markdown": "An đặt phong thư xuống bàn, miết ngón tay dọc mép giấy. Dưới ngọn đèn, đường keo hiện thành hai nếp mảnh. Cô nghiêng thư lại gần ánh sáng, nhưng bóng ngón tay che khuất mép giấy. An đổi tay cầm. Hai nếp vẫn còn đó.\n\nCửa vang lên một tiếng gõ. Cô đặt thư xuống, nhìn sang cánh cửa rồi luồn phong thư vào ngăn kéo. Gỗ cọ vào giấy nghe khô và nhẹ. Khi tiếng gõ thứ hai cất lên, tay An vẫn giữ trên núm gỗ. Cô không đứng dậy.",
+        "constraint_sources": [
+          {
+            "authority_kind": "skeleton",
+            "artifact_id": "skeleton_ch_0001",
+            "revision": 1,
+            "field_path": "sections[0].forbidden_moves",
+            "content": [
+              "Không giải thích nguyên nhân nếp keo",
+              "Không cho người ngoài cửa xuất hiện",
+              "Giữ phong thư đóng."
+            ]
+          }
+        ],
+        "skeleton": {
+          "sections": [
+            {
+              "section_id": "section_0001",
+              "instruction": "An đặt phong thư lên bàn. Cô nhận ra mép keo có hai nếp, cất thư khi nghe tiếng gõ cửa; chưa mở cửa.",
+              "writer_notes": [
+                "Ngôi ba giới hạn theo An; nhịp chậm."
+              ],
+              "required_beats": [
+                "Nhìn thấy hai nếp keo",
+                "Cất thư trước tiếng gõ tiếp theo"
+              ],
+              "forbidden_moves": [
+                "Không giải thích nguyên nhân nếp keo",
+                "Không cho người ngoài cửa xuất hiện",
+                "Giữ phong thư đóng."
+              ],
+              "foreshadow_surfaces": [
+                "Mép keo có hai nếp, chỉ tả điều nhìn thấy."
+              ]
+            }
+          ],
+          "global_constraints": [
+            "Ngôn ngữ: tiếng Việt.",
+            "POV: ngôi ba giới hạn theo An.",
+            "Độ dài: khoảng 100–150 từ cho cảnh mẫu."
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "public_profile": {
+              "voice": "Nói ngắn, dè chừng."
+            },
+            "writer_profile": {
+              "behavior_notes": [
+                "Giữ đồ vật gần mình."
+              ]
+            }
+          }
+        ],
+        "world_rules": [],
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "previous_final_summary": null,
+        "style": "# Văn phong mặc định v1\n\nHướng dẫn thể hiện cho Writer/Rewrite; Review có thể đối chiếu. Nhường yêu cầu tác giả và mọi constraint accepted. Không thay Skeleton, thiết kế plot, thêm manh mối hoặc ép thể loại.\n\n- Dùng động từ rõ chủ thể, chi tiết cảm giác được POV nhận biết. Chọn chi tiết phục vụ cảnh, không liệt kê giác quan theo công thức.\n- Giọng thoại theo profile, vị thế và mục đích của từng người. Cho lời đáp có phản ứng, khoảng lặng khi có ý nghĩa; không bắt mọi câu đều cụt hoặc mọi người đều né tránh.\n- Cảnh quan trọng có hành động và phản ứng đủ sức nặng; chuyển cảnh gọn nhưng không bỏ mất nguyên nhân. Nhịp câu theo nhịp cảnh, không áp tỷ lệ câu dài/ngắn.\n- Tránh hình ảnh sáo, cấu trúc đối xứng và lời bình chủ đề lặp. Có thể kể trực tiếp để nối thời gian; không biến “thể hiện” thành cấm tuyệt đối mọi câu gọi tên cảm xúc.\n- Giữ định dạng thoại nhất quán, đổi đoạn khi đổi người nói. Không biến section Skeleton thành danh sách hay đề mục kỹ thuật trong truyện.\n- Kết ở tình thế Skeleton yêu cầu. Không cần ép câu triết lý, cliffhanger hoặc một bí ẩn mới vào cuối mỗi chương.\n\nKhông có nguồn bổ sung phải đọc hoặc trạng thái phải tự lưu. Đây là guidance ngôn ngữ, không phải bộ kiểm tra tự động hay điều kiện finalize.\n",
+        "review_focus": "Kiểm tra hành động mở thư."
+      },
+      "response": {
+        "chapter_id": "ch_0001",
+        "prose_revision": 1,
+        "issues": [],
+        "summary": "Trong prose được cấp, thư vẫn đóng; chưa thấy deviation với constraint đang kiểm tra. Human Review vẫn cần do người dùng thực hiện."
+      }
+    },
+    {
+      "case_id": "rewrite_local",
+      "prompt_id": "rewrite_section.v1",
+      "request": {
+        "request": {
+          "chapter_id": "ch_0001",
+          "prose_revision": 1,
+          "section_id": "section_0001",
+          "selected_text": "An lo lắng. An rất lo lắng.",
+          "instruction": "Giảm lặp, thể hiện dè chừng bằng động tác.",
+          "constraints": [
+            "Giữ thư đóng."
+          ],
+          "context_pins": [
+            {
+              "artifact_id": "skeleton_ch_0001",
+              "revision": 1,
+              "scope": "skeleton"
+            }
+          ]
+        },
+        "target_markdown": "An lo lắng. An rất lo lắng.",
+        "surrounding_before": "An ngồi bên bàn.",
+        "surrounding_after": "Ngoài cửa vẫn im lặng.",
+        "skeleton": {
+          "sections": [
+            {
+              "section_id": "section_0001",
+              "instruction": "An đặt phong thư lên bàn. Cô nhận ra mép keo có hai nếp, cất thư khi nghe tiếng gõ cửa; chưa mở cửa.",
+              "writer_notes": [
+                "Ngôi ba giới hạn theo An; nhịp chậm."
+              ],
+              "required_beats": [
+                "Nhìn thấy hai nếp keo",
+                "Cất thư trước tiếng gõ tiếp theo"
+              ],
+              "forbidden_moves": [
+                "Không giải thích nguyên nhân nếp keo",
+                "Không cho người ngoài cửa xuất hiện",
+                "Giữ phong thư đóng."
+              ],
+              "foreshadow_surfaces": [
+                "Mép keo có hai nếp, chỉ tả điều nhìn thấy."
+              ]
+            }
+          ],
+          "global_constraints": [
+            "Ngôn ngữ: tiếng Việt.",
+            "POV: ngôi ba giới hạn theo An.",
+            "Độ dài: khoảng 100–150 từ cho cảnh mẫu."
+          ]
+        },
+        "base_idea_constraints": [
+          "Không giải quyết bí ẩn bằng năng lực siêu nhiên."
+        ],
+        "premise_constraints": [
+          "Giữ giới hạn hiểu biết theo An."
+        ],
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "public_profile": {
+              "voice": "Nói ngắn, dè chừng."
+            },
+            "writer_profile": {
+              "behavior_notes": [
+                "Giữ đồ vật gần mình."
+              ]
+            }
+          }
+        ],
+        "world_rules": [],
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "style": "# Văn phong mặc định v1\n\nHướng dẫn thể hiện cho Writer/Rewrite; Review có thể đối chiếu. Nhường yêu cầu tác giả và mọi constraint accepted. Không thay Skeleton, thiết kế plot, thêm manh mối hoặc ép thể loại.\n\n- Dùng động từ rõ chủ thể, chi tiết cảm giác được POV nhận biết. Chọn chi tiết phục vụ cảnh, không liệt kê giác quan theo công thức.\n- Giọng thoại theo profile, vị thế và mục đích của từng người. Cho lời đáp có phản ứng, khoảng lặng khi có ý nghĩa; không bắt mọi câu đều cụt hoặc mọi người đều né tránh.\n- Cảnh quan trọng có hành động và phản ứng đủ sức nặng; chuyển cảnh gọn nhưng không bỏ mất nguyên nhân. Nhịp câu theo nhịp cảnh, không áp tỷ lệ câu dài/ngắn.\n- Tránh hình ảnh sáo, cấu trúc đối xứng và lời bình chủ đề lặp. Có thể kể trực tiếp để nối thời gian; không biến “thể hiện” thành cấm tuyệt đối mọi câu gọi tên cảm xúc.\n- Giữ định dạng thoại nhất quán, đổi đoạn khi đổi người nói. Không biến section Skeleton thành danh sách hay đề mục kỹ thuật trong truyện.\n- Kết ở tình thế Skeleton yêu cầu. Không cần ép câu triết lý, cliffhanger hoặc một bí ẩn mới vào cuối mỗi chương.\n\nKhông có nguồn bổ sung phải đọc hoặc trạng thái phải tự lưu. Đây là guidance ngôn ngữ, không phải bộ kiểm tra tự động hay điều kiện finalize.\n"
+      },
+      "response": {
+        "replacement_markdown": "An đặt tay lên phong thư, rồi kéo nó về phía mình trước khi ngẩng nhìn cánh cửa.",
+        "notes": [
+          "Giảm lặp cảm xúc, giữ phong thư đóng và nhân vật tại bàn."
+        ],
+        "changed_intent": false
+      }
+    },
+    {
+      "case_id": "rewrite_blocked",
+      "prompt_id": "rewrite_section.v1",
+      "request": {
+        "request": {
+          "chapter_id": "ch_0001",
+          "prose_revision": 1,
+          "section_id": "section_0001",
+          "selected_text": "An lo lắng. An rất lo lắng.",
+          "instruction": "Cho An mở thư và biết hết bí mật.",
+          "constraints": [
+            "Giữ thư đóng."
+          ],
+          "context_pins": [
+            {
+              "artifact_id": "skeleton_ch_0001",
+              "revision": 1,
+              "scope": "skeleton"
+            }
+          ]
+        },
+        "target_markdown": "An lo lắng. An rất lo lắng.",
+        "surrounding_before": "An ngồi bên bàn.",
+        "surrounding_after": "Ngoài cửa vẫn im lặng.",
+        "skeleton": {
+          "sections": [
+            {
+              "section_id": "section_0001",
+              "instruction": "An đặt phong thư lên bàn. Cô nhận ra mép keo có hai nếp, cất thư khi nghe tiếng gõ cửa; chưa mở cửa.",
+              "writer_notes": [
+                "Ngôi ba giới hạn theo An; nhịp chậm."
+              ],
+              "required_beats": [
+                "Nhìn thấy hai nếp keo",
+                "Cất thư trước tiếng gõ tiếp theo"
+              ],
+              "forbidden_moves": [
+                "Không giải thích nguyên nhân nếp keo",
+                "Không cho người ngoài cửa xuất hiện",
+                "Giữ phong thư đóng."
+              ],
+              "foreshadow_surfaces": [
+                "Mép keo có hai nếp, chỉ tả điều nhìn thấy."
+              ]
+            }
+          ],
+          "global_constraints": [
+            "Ngôn ngữ: tiếng Việt.",
+            "POV: ngôi ba giới hạn theo An.",
+            "Độ dài: khoảng 100–150 từ cho cảnh mẫu."
+          ]
+        },
+        "base_idea_constraints": [
+          "Không giải quyết bí ẩn bằng năng lực siêu nhiên."
+        ],
+        "premise_constraints": [
+          "Giữ giới hạn hiểu biết theo An."
+        ],
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "public_profile": {
+              "voice": "Nói ngắn, dè chừng."
+            },
+            "writer_profile": {
+              "behavior_notes": [
+                "Giữ đồ vật gần mình."
+              ]
+            }
+          }
+        ],
+        "world_rules": [],
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "style": "# Văn phong mặc định v1\n\nHướng dẫn thể hiện cho Writer/Rewrite; Review có thể đối chiếu. Nhường yêu cầu tác giả và mọi constraint accepted. Không thay Skeleton, thiết kế plot, thêm manh mối hoặc ép thể loại.\n\n- Dùng động từ rõ chủ thể, chi tiết cảm giác được POV nhận biết. Chọn chi tiết phục vụ cảnh, không liệt kê giác quan theo công thức.\n- Giọng thoại theo profile, vị thế và mục đích của từng người. Cho lời đáp có phản ứng, khoảng lặng khi có ý nghĩa; không bắt mọi câu đều cụt hoặc mọi người đều né tránh.\n- Cảnh quan trọng có hành động và phản ứng đủ sức nặng; chuyển cảnh gọn nhưng không bỏ mất nguyên nhân. Nhịp câu theo nhịp cảnh, không áp tỷ lệ câu dài/ngắn.\n- Tránh hình ảnh sáo, cấu trúc đối xứng và lời bình chủ đề lặp. Có thể kể trực tiếp để nối thời gian; không biến “thể hiện” thành cấm tuyệt đối mọi câu gọi tên cảm xúc.\n- Giữ định dạng thoại nhất quán, đổi đoạn khi đổi người nói. Không biến section Skeleton thành danh sách hay đề mục kỹ thuật trong truyện.\n- Kết ở tình thế Skeleton yêu cầu. Không cần ép câu triết lý, cliffhanger hoặc một bí ẩn mới vào cuối mỗi chương.\n\nKhông có nguồn bổ sung phải đọc hoặc trạng thái phải tự lưu. Đây là guidance ngôn ngữ, không phải bộ kiểm tra tự động hay điều kiện finalize.\n"
+      },
+      "response": {
+        "replacement_markdown": "An lo lắng. An rất lo lắng.",
+        "notes": [
+          "Yêu cầu mở thư đổi intent giữ thư đóng; cần người dùng review upstream trước."
+        ],
+        "changed_intent": true
+      }
+    },
+    {
+      "case_id": "reconcile_unknown_knock",
+      "prompt_id": "reconcile.v1",
+      "request": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 1,
+        "source_final_candidate": {
+          "prose_revision": 2,
+          "markdown_ref": "chapters/ch_0001/final_candidate_r0002.md"
+        },
+        "final_candidate_markdown": "Đêm ấy, trong phòng trọ, An cất phong thư vào ngăn kéo. Bên ngoài có tiếng gõ. Cô ngồi yên.",
+        "timeline_as_of": [],
+        "relationships_as_of": [],
+        "known_characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "aliases": []
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Bình",
+            "aliases": [
+              "Anh Bình"
+            ]
+          }
+        ]
+      },
+      "response": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 1,
+        "source_final_candidate": {
+          "prose_revision": 2,
+          "markdown_ref": "chapters/ch_0001/final_candidate_r0002.md"
+        },
+        "timeline": {
+          "time": "Đêm ấy",
+          "location": "Phòng trọ",
+          "status": "An cất phong thư vào ngăn kéo và ngồi yên khi nghe tiếng gõ bên ngoài."
+        },
+        "relationship_updates": [],
+        "notes": [
+          "Tiếng gõ không xác định danh tính; không tạo quan hệ với người ngoài cửa."
+        ]
+      }
+    },
+    {
+      "case_id": "reconcile_actual_relationship",
+      "prompt_id": "reconcile.v1",
+      "request": {
+        "chapter_id": "ch_0002",
+        "chapter_number": 2,
+        "source_final_candidate": {
+          "prose_revision": 1,
+          "markdown_ref": "chapters/ch_0002/final_candidate_r0001.md"
+        },
+        "final_candidate_markdown": "Sáng hôm sau, An mở cửa phòng trọ cho Bình. Cô giữ tay trên cánh cửa khi anh nhìn chiếc bàn chắn lối.\n\n“Nhấc bên ấy giúp tôi.”\n\nBình đỡ một đầu bàn. Họ cùng dịch nó sát tường; phong thư vẫn nằm trong ngăn kéo. An gật đầu cảm ơn rồi lùi lại. Bình đứng nguyên cạnh cửa, không hỏi về phong thư. Cả hai chỉ nói với nhau vài lời, đủ để tránh va chân vào bàn.",
+        "timeline_as_of": [
+          {
+            "timeline_id": "timeline_0001",
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "time": "Đêm ấy",
+            "location": "Phòng trọ",
+            "status": "An cất phong thư vào ngăn kéo và ngồi yên khi nghe tiếng gõ bên ngoài.",
+            "source_final_revision": 2,
+            "accepted_at": "2026-09-20T10:00:00+07:00"
+          }
+        ],
+        "relationships_as_of": [],
+        "known_characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "An",
+            "aliases": []
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Bình",
+            "aliases": [
+              "Anh Bình"
+            ]
+          }
+        ]
+      },
+      "response": {
+        "chapter_id": "ch_0002",
+        "chapter_number": 2,
+        "source_final_candidate": {
+          "prose_revision": 1,
+          "markdown_ref": "chapters/ch_0002/final_candidate_r0001.md"
+        },
+        "timeline": {
+          "time": "Sáng hôm sau",
+          "location": "Phòng trọ",
+          "status": "An mở cửa cho Bình; họ cùng dịch bàn sát tường, thư vẫn trong ngăn kéo."
+        },
+        "relationship_updates": [
+          {
+            "character_ids": [
+              "char_0001",
+              "char_0002"
+            ],
+            "current": "Đã giúp nhau dịch bàn; An còn giữ khoảng cách, Bình đứng cạnh cửa."
+          }
+        ],
+        "notes": [
+          "Bằng chứng: “Họ cùng dịch nó sát tường” và “An gật đầu cảm ơn rồi lùi lại.” Không suy tin tưởng tuyệt đối."
+        ]
+      }
+    },
+    {
+      "case_id": "impact_object_location",
+      "prompt_id": "retcon_impact.v1",
+      "request": {
+        "source_change": {
+          "item_kind": "chapter_final",
+          "item_id": "ch_0001",
+          "from_revision": 1,
+          "to_candidate_revision": 3
+        },
+        "before_content": "An mang phong thư đi.",
+        "after_content": "An để phong thư trong ngăn kéo phòng trọ.",
+        "downstream_items": [
+          {
+            "item_kind": "skeleton",
+            "item_id": "skeleton_ch_0002",
+            "revision": 1,
+            "dependency_pins": [
+              {
+                "artifact_id": "chapter_ch_0001",
+                "revision": 1,
+                "scope": "final"
+              }
+            ],
+            "content_summary": "An lấy thư từ túi."
+          }
+        ],
+        "state_before_change": {
+          "timeline_as_of": [],
+          "relationships_as_of": []
+        },
+        "analysis_scope": "Chương 1 và Skeleton chương 2; không có prose chương 2."
+      },
+      "response": {
+        "source_change": {
+          "item_kind": "chapter_final",
+          "item_id": "ch_0001",
+          "from_revision": 1,
+          "to_candidate_revision": 3
+        },
+        "affected_items": [
+          {
+            "item_kind": "skeleton",
+            "item_id": "skeleton_ch_0002",
+            "reason": "Bản cũ mang thư đi; bản sửa để thư trong ngăn kéo. Summary Skeleton chương 2 vẫn yêu cầu An lấy thư từ túi.",
+            "severity": "major",
+            "suggested_action": "Người dùng review điểm nối về vị trí phong thư trong Skeleton chương 2."
+          }
+        ],
+        "risk_summary": "Có xung đột vị trí đồ vật trong phạm vi hai chương đã cấp; chưa đánh giá phần ngoài phạm vi.",
+        "suggested_actions": [
+          "Review Skeleton chương 2 sau khi quyết định bản retcon; không tự rewrite final prose."
+        ]
+      }
+    },
+    {
+      "case_id": "impact_wording_only",
+      "prompt_id": "retcon_impact.v1",
+      "request": {
+        "source_change": {
+          "item_kind": "chapter_final",
+          "item_id": "ch_0001",
+          "from_revision": 1,
+          "to_candidate_revision": 3
+        },
+        "before_content": "An mang phong thư đi.",
+        "after_content": "An đem phong thư đi.",
+        "downstream_items": [
+          {
+            "item_kind": "skeleton",
+            "item_id": "skeleton_ch_0002",
+            "revision": 1,
+            "dependency_pins": [
+              {
+                "artifact_id": "chapter_ch_0001",
+                "revision": 1,
+                "scope": "final"
+              }
+            ],
+            "content_summary": "An lấy thư từ túi."
+          }
+        ],
+        "state_before_change": {
+          "timeline_as_of": [],
+          "relationships_as_of": []
+        },
+        "analysis_scope": "Chương 1 và Skeleton chương 2; không có prose chương 2."
+      },
+      "response": {
+        "source_change": {
+          "item_kind": "chapter_final",
+          "item_id": "ch_0001",
+          "from_revision": 1,
+          "to_candidate_revision": 3
+        },
+        "affected_items": [],
+        "risk_summary": "Chỉ đổi cách diễn đạt mang/đem; vị trí thư không đổi trong phạm vi được cấp.",
+        "suggested_actions": []
+      }
+    }
+  ]
+}

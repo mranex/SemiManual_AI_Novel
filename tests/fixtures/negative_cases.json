@@ -1,0 +1,369 @@
+{
+  "schema_version": 1,
+  "purpose": "Negative cases bổ sung cho T08, ngoài invalid_examples.json của T02. Mỗi case gọi validate_artifact_payload/helper tương ứng và phải trả đúng path + code.",
+  "cases": [
+    {
+      "case_id": "duplicate_character_id",
+      "artifact_type": "characters",
+      "payload": {
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Sở Dương",
+            "role": "protagonist",
+            "public_profile": {}
+          },
+          {
+            "character_id": "char_0001",
+            "display_name": "Bản sao",
+            "role": "ally",
+            "public_profile": {}
+          }
+        ]
+      },
+      "expected_errors": [
+        { "path": "/payload/characters/1/character_id", "code": "duplicate_stable_id" }
+      ]
+    },
+    {
+      "case_id": "display_name_used_as_character_key",
+      "artifact_type": "characters",
+      "payload": {
+        "characters": [
+          {
+            "character_id": "Sở Dương",
+            "display_name": "Sở Dương",
+            "role": "protagonist",
+            "public_profile": {}
+          }
+        ]
+      },
+      "expected_errors": [
+        { "path": "/payload/characters/0/character_id", "code": "invalid_stable_id" }
+      ]
+    },
+    {
+      "case_id": "short_plan_unknown_character_reference",
+      "artifact_type": "short_plan",
+      "payload": {
+        "arc_id": "arc_0001",
+        "chapters": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "title": "Đường vắng",
+            "summary": "Mở đầu.",
+            "character_ids": ["char_9999"],
+            "chapter_goal": "Thiết lập."
+          }
+        ]
+      },
+      "context": {
+        "index": {
+          "arc_ids": ["arc_0001"],
+          "character_ids": ["char_0001"],
+          "character_effective": { "char_0001": 1 },
+          "world_rule_ids": ["rule_0001"],
+          "world_rule_effective": { "rule_0001": 1 }
+        }
+      },
+      "expected_errors": [
+        { "path": "/payload/chapters/0/character_ids/0", "code": "unknown_reference" }
+      ]
+    },
+    {
+      "case_id": "short_plan_world_rule_effective_future",
+      "artifact_type": "short_plan",
+      "payload": {
+        "arc_id": "arc_0001",
+        "chapters": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "title": "Đường vắng",
+            "summary": "Mở đầu.",
+            "world_rule_ids": ["rule_0001", "rule_0100"],
+            "chapter_goal": "Thiết lập."
+          }
+        ]
+      },
+      "context": {
+        "index": {
+          "arc_ids": ["arc_0001"],
+          "world_rule_ids": ["rule_0001", "rule_0100"],
+          "world_rule_effective": { "rule_0001": 1, "rule_0100": 100 }
+        }
+      },
+      "expected_errors": [
+        { "path": "/payload/chapters/0/world_rule_ids/1", "code": "effective_from_future" }
+      ]
+    },
+    {
+      "case_id": "short_plan_outline_contract_incomplete",
+      "artifact_type": "short_plan",
+      "payload": {
+        "arc_id": "arc_0001",
+        "chapters": [
+          {
+            "chapter_id": "ch_0001",
+            "chapter_number": 1,
+            "title": "Đường vắng",
+            "summary": "Mở đầu.",
+            "outline": [{ "language": "vi", "pov": "ngôi thứ ba" }],
+            "chapter_goal": "Thiết lập."
+          }
+        ]
+      },
+      "expected_errors": [
+        { "path": "/payload/chapters/ch_0001/outline/0", "code": "invalid_outline_contract_item" }
+      ]
+    },
+    {
+      "case_id": "short_plan_temporary_chapter_id",
+      "artifact_type": "short_plan",
+      "payload": {
+        "arc_id": "arc_0001",
+        "chapters": [
+          {
+            "chapter_id": "tmp_section_1",
+            "chapter_number": 1,
+            "title": "Đường vắng",
+            "summary": "Mở đầu.",
+            "chapter_goal": "Thiết lập."
+          }
+        ]
+      },
+      "expected_errors": [
+        { "path": "/payload/chapters/0/chapter_id", "code": "temporary_id_not_allowed" }
+      ]
+    },
+    {
+      "case_id": "skeleton_duplicate_section_index",
+      "artifact_type": "skeleton",
+      "payload": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 1,
+        "sections": [
+          {
+            "section_id": "section_0001",
+            "index": 1,
+            "type": "action",
+            "instruction": "Mở cảnh.",
+            "purpose": "Gieo tình huống."
+          },
+          {
+            "section_id": "section_0002",
+            "index": 1,
+            "type": "ending",
+            "instruction": "Kết cảnh.",
+            "purpose": "Chốt nhịp."
+          }
+        ]
+      },
+      "context": {
+        "chapter_number": 1,
+        "index": { "chapter_ids": ["ch_0001"], "chapter_numbers": { "ch_0001": 1 } }
+      },
+      "expected_errors": [
+        { "path": "/payload/sections/1/index", "code": "duplicate_section_index" }
+      ]
+    },
+    {
+      "case_id": "skeleton_chapter_not_in_short_plan",
+      "artifact_type": "skeleton",
+      "payload": {
+        "chapter_id": "ch_0099",
+        "chapter_number": 99,
+        "sections": [
+          {
+            "section_id": "section_0001",
+            "index": 1,
+            "type": "action",
+            "instruction": "Mở cảnh.",
+            "purpose": "Gieo tình huống."
+          }
+        ]
+      },
+      "context": {
+        "chapter_number": 99,
+        "index": { "chapter_ids": ["ch_0001"], "chapter_numbers": { "ch_0001": 1 } }
+      },
+      "expected_errors": [
+        { "path": "/payload/chapter_id", "code": "unknown_reference" }
+      ]
+    },
+    {
+      "case_id": "reconciliation_future_character_update",
+      "artifact_type": "reconciliation",
+      "payload": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 1,
+        "source_final_candidate": { "prose_revision": 2, "markdown_ref": "final_r0002.md" },
+        "timeline": { "time": "Đêm đầu", "location": "Sườn núi", "status": "Tỉnh dậy." },
+        "relationship_updates": [
+          {
+            "character_ids": ["char_0001", "char_0002"],
+            "current": "Chưa gặp trực tiếp."
+          }
+        ],
+        "notes": []
+      },
+      "context": {
+        "index": {
+          "character_ids": ["char_0001", "char_0002"],
+          "character_effective": { "char_0001": 1, "char_0002": 2 },
+          "chapter_ids": ["ch_0001"],
+          "chapter_numbers": { "ch_0001": 1 }
+        }
+      },
+      "expected_errors": [
+        { "path": "/payload/relationship_updates/0/character_ids/1", "code": "effective_from_future" }
+      ]
+    },
+    {
+      "case_id": "rolling_patch_field_not_allowed",
+      "artifact_type": "rolling_patch",
+      "payload": {
+        "status": "adjust",
+        "reviewed_chapter_range": { "start": 1, "end": 1 },
+        "short_plan_changes": [
+          {
+            "chapter_id": "ch_0002",
+            "changes": { "character_ids": ["char_0003"] },
+            "reason": "Thêm nhân vật."
+          }
+        ]
+      },
+      "context": {
+        "eligible_chapter_ids": ["ch_0002"],
+        "allow_relationship_replan": true
+      },
+      "expected_errors": [
+        { "path": "/payload/short_plan_changes/0/changes", "code": "field_not_allowed" }
+      ]
+    },
+    {
+      "case_id": "rolling_patch_targets_chapter_outside_scope",
+      "artifact_type": "rolling_patch",
+      "payload": {
+        "status": "adjust",
+        "reviewed_chapter_range": { "start": 1, "end": 1 },
+        "short_plan_changes": [
+          { "chapter_id": "ch_0001", "changes": { "summary": "Sửa chương đã final." }, "reason": "Muốn đổi." }
+        ]
+      },
+      "context": {
+        "eligible_chapter_ids": ["ch_0002"],
+        "allow_relationship_replan": true
+      },
+      "expected_errors": [
+        { "path": "/payload/short_plan_changes", "code": "out_of_scope" }
+      ]
+    },
+    {
+      "case_id": "rolling_patch_relationship_disabled",
+      "artifact_type": "rolling_patch",
+      "payload": {
+        "status": "adjust",
+        "reviewed_chapter_range": { "start": 1, "end": 1 },
+        "relationship_plan_changes": [
+          {
+            "chapter_id": "ch_0002",
+            "relationship_changes": [
+              {
+                "character_ids": ["char_0001", "char_0002"],
+                "arc_direction": "dè chừng",
+                "target_state": "Hợp tác",
+                "notes": ""
+              }
+            ],
+            "reason": "Muốn đổi nhịp."
+          }
+        ]
+      },
+      "context": {
+        "eligible_chapter_ids": ["ch_0002"],
+        "allow_relationship_replan": false
+      },
+      "expected_errors": [
+        { "path": "/payload/relationship_plan_changes/0/relationship_changes", "code": "relationship_replan_disabled" }
+      ]
+    },
+    {
+      "case_id": "rolling_patch_status_ok_with_changes",
+      "artifact_type": "rolling_patch",
+      "payload": {
+        "status": "ok",
+        "reviewed_chapter_range": { "start": 1, "end": 1 },
+        "short_plan_changes": [
+          { "chapter_id": "ch_0002", "changes": { "hook": "Hook mới." }, "reason": "Nối actual." }
+        ]
+      },
+      "context": {
+        "eligible_chapter_ids": ["ch_0002"],
+        "allow_relationship_replan": true
+      },
+      "expected_errors": [
+        { "path": "/payload/status", "code": "status_mismatch" }
+      ]
+    },
+    {
+      "case_id": "review_evidence_other_revision",
+      "artifact_type": "review_report",
+      "payload": {
+        "chapter_id": "ch_0001",
+        "prose_revision": 3,
+        "summary": "Có một issue.",
+        "issues": [
+          {
+            "issue_id": "issue_0001",
+            "severity": "minor",
+            "category": "style_issue",
+            "source": { "authority_kind": "skeleton", "artifact_id": "skeleton_ch_0001", "revision": 1 },
+            "evidence": { "prose_revision": 2, "quote": "Câu cũ." },
+            "message": "Câu này thuộc revision cũ."
+          }
+        ]
+      },
+      "expected_errors": [
+        { "path": "/payload/issues/0/evidence/prose_revision", "code": "review_revision_mismatch" }
+      ]
+    },
+    {
+      "case_id": "rewrite_empty_replacement",
+      "artifact_type": "rewrite_section",
+      "payload": { "replacement_markdown": "   ", "notes": [], "changed_intent": false },
+      "expected_errors": [
+        { "path": "/payload/replacement_markdown", "code": "empty_replacement" }
+      ]
+    },
+    {
+      "case_id": "unknown_field_on_payload",
+      "artifact_type": "premise",
+      "payload": {
+        "title": "Nồi Canh Bên Đường",
+        "logline": "Một bác sĩ tỉnh dậy ở giới khác.",
+        "character_ids": ["char_0001"]
+      },
+      "expected_errors": [
+        { "path": "/payload/character_ids", "code": "unknown_field" }
+      ]
+    }
+  ],
+  "helper_cases": [
+    {
+      "case_id": "auto_accept_review_confirmation",
+      "helper": "validate_auto_accept_scope",
+      "kwargs": { "auto_accept_structured": true, "output_kind": "human_review" },
+      "expected_errors": [
+        { "path": "/payload/output_kind", "code": "auto_accept_cannot_finalize_prose" }
+      ]
+    },
+    {
+      "case_id": "auto_accept_structured_allowed",
+      "helper": "validate_auto_accept_scope",
+      "kwargs": { "auto_accept_structured": true, "output_kind": "characters" },
+      "expected_errors": []
+    }
+  ]
+}

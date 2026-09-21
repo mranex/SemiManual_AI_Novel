@@ -1,0 +1,51 @@
+# Môi trường ảo Python
+.venv/
+venv/
+env/
+
+# Prompt tham khảo
+docs/genres/
+docs/references/
+docs/styles/
+docs/tasks/
+docs/prompts/arbiter-failure.md
+docs/prompts/arbiter-intervention.md
+docs/prompts/arbiter-plan-start.md
+docs/prompts/architect-long.md
+docs/prompts/architect-short.md
+docs/prompts/editor.md
+docs/prompts/import-analyze.md
+docs/prompts/import-range.md
+docs/prompts/import-segment.md
+docs/prompts/import-synthesize.md
+docs/prompts/revision-analyze.md
+docs/prompts/simulation-merge.md
+docs/prompts/simulation-source.md
+docs/prompts/writer.md
+
+# Cấu hình local và secret: không bao giờ commit
+.env
+.env.local
+.streamlit/secrets.toml
+
+# Dữ liệu truyện của người dùng
+projects/
+
+# Cache/build Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Cache test và tool
+.pytest_cache/
+.coverage
+htmlcov/
+manual_ai_novel.egg-info/
+
+# Editor/OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

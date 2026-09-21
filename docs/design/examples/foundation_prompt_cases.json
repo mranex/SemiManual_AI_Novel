@@ -1,0 +1,605 @@
+{
+  "purpose": "Ví dụ kỳ vọng biên soạn thủ công để rà prompt, không phải kết quả gọi LLM hoặc test runtime.",
+  "cases": [
+    {
+      "id": "co_create_turn_1",
+      "prompt_id": "co_create.v1",
+      "request": {
+        "language": "vi",
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "conversation_summary": "",
+        "current_idea_state": {
+          "genre": "",
+          "tone": "",
+          "protagonist": "",
+          "core_concept": "",
+          "setting": "",
+          "conflict": "",
+          "constraints": [],
+          "open_questions": []
+        },
+        "user_message": "Tôi muốn một nữ pháp y điều tra án mạng trong thành phố nổi."
+      },
+      "expected_response": {
+        "message": "Bối cảnh này có thể tạo trở ngại điều tra rất riêng. Bạn muốn ưu tiên suy luận từ dấu vết vật lý hay áp lực từ quyền tiếp cận các tầng?\n\n## Ý tưởng hiện tại\n- Một nữ pháp y điều tra án mạng trong thành phố nổi.\n\n## Nhân vật và xung đột\n- Nhân vật trung tâm là nữ pháp y; cô cần làm rõ vụ án.\n\n## Bối cảnh và sắc thái\n- Thành phố nổi; cơ chế vận hành và tone chưa chọn.\n\n## Ràng buộc đã chốt\n- Chưa có yêu cầu bổ sung.\n\n## Điều còn mở\n- Đề xuất chưa chọn: dấu vết bị luồng gió làm sai lệch, hoặc việc tiếp cận các tầng bị hạn chế.\n\n## Bạn có thể nói tiếp\n- Tôi muốn ưu tiên suy luận vật lý.\n- Tôi muốn tập trung vào áp lực xã hội.",
+        "idea_state": {
+          "genre": "suspense",
+          "tone": "",
+          "protagonist": "Một nữ pháp y.",
+          "core_concept": "Một nữ pháp y điều tra án mạng trong thành phố nổi.",
+          "setting": "Thành phố nổi.",
+          "conflict": "Điều tra để làm rõ vụ án.",
+          "constraints": [],
+          "open_questions": [
+            "Ưu tiên suy luận từ dấu vết vật lý hay áp lực từ quyền tiếp cận các tầng?",
+            "Cơ chế thành phố nổi và sắc thái truyện là gì?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "co_create_turn_2",
+      "prompt_id": "co_create.v1",
+      "request": {
+        "language": "vi",
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "conversation_summary": "Người dùng chọn nữ pháp y điều tra án mạng ở thành phố nổi. Các hướng gió/quyền tiếp cận mới là đề xuất.",
+        "current_idea_state": {
+          "genre": "suspense",
+          "tone": "",
+          "protagonist": "Một nữ pháp y.",
+          "core_concept": "Một nữ pháp y điều tra án mạng trong thành phố nổi.",
+          "setting": "Thành phố nổi.",
+          "conflict": "Điều tra để làm rõ vụ án.",
+          "constraints": [],
+          "open_questions": [
+            "Ưu tiên suy luận từ dấu vết vật lý hay áp lực từ quyền tiếp cận các tầng?",
+            "Cơ chế thành phố nổi và sắc thái truyện là gì?"
+          ]
+        },
+        "user_message": "Tôi chọn suy luận vật lý, tone ấm áp có hài khô; đừng thêm mất trí nhớ."
+      },
+      "expected_response": {
+        "message": "Ta giữ hướng suy luận vật lý và sắc thái ấm áp. Thành phố nổi vận hành bằng công nghệ hay ma pháp?\n\n## Ý tưởng hiện tại\n- Nữ pháp y điều tra án mạng trong thành phố nổi bằng dấu vết vật lý.\n\n## Nhân vật và xung đột\n- Nhân vật trung tâm là nữ pháp y, cần làm rõ vụ án.\n\n## Bối cảnh và sắc thái\n- Thành phố nổi; ấm áp, có hài khô.\n\n## Ràng buộc đã chốt\n- Không mất trí nhớ.\n\n## Điều còn mở\n- Công nghệ hay ma pháp giữ thành phố nổi?\n\n## Bạn có thể nói tiếp\n- Tôi chọn công nghệ.\n- Tôi muốn ma pháp có giới hạn rõ.",
+        "idea_state": {
+          "genre": "suspense",
+          "tone": "Ấm áp, có hài khô.",
+          "protagonist": "Một nữ pháp y.",
+          "core_concept": "Một nữ pháp y điều tra án mạng trong thành phố nổi.",
+          "setting": "Thành phố nổi.",
+          "conflict": "Điều tra bằng suy luận từ dấu vết vật lý.",
+          "constraints": [
+            "Không mất trí nhớ."
+          ],
+          "open_questions": [
+            "Thành phố nổi vận hành bằng công nghệ hay ma pháp?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "co_create_turn_3_no_new_setting",
+      "prompt_id": "co_create.v1",
+      "request": {
+        "language": "vi",
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "conversation_summary": "Đã chọn suy luận vật lý, tone ấm áp có hài khô, không mất trí nhớ; chưa chọn cơ chế thành phố nổi.",
+        "current_idea_state": {
+          "genre": "suspense",
+          "tone": "Ấm áp, có hài khô.",
+          "protagonist": "Một nữ pháp y.",
+          "core_concept": "Một nữ pháp y điều tra án mạng trong thành phố nổi.",
+          "setting": "Thành phố nổi.",
+          "conflict": "Điều tra bằng suy luận từ dấu vết vật lý.",
+          "constraints": [
+            "Không mất trí nhớ."
+          ],
+          "open_questions": [
+            "Thành phố nổi vận hành bằng công nghệ hay ma pháp?"
+          ]
+        },
+        "user_message": "Không thêm tuyến tình cảm. Tóm tắt đầy đủ để tôi xem lại."
+      },
+      "expected_response": {
+        "message": "Dưới đây là brief đã bổ sung ràng buộc về tuyến tình cảm.\n\n## Ý tưởng hiện tại\n- Nữ pháp y điều tra án mạng trong thành phố nổi bằng dấu vết vật lý.\n\n## Nhân vật và xung đột\n- Nhân vật trung tâm là nữ pháp y, cần làm rõ vụ án.\n\n## Bối cảnh và sắc thái\n- Thành phố nổi; ấm áp, có hài khô.\n\n## Ràng buộc đã chốt\n- Không mất trí nhớ.\n- Không thêm tuyến tình cảm.\n\n## Điều còn mở\n- Cơ chế công nghệ hay ma pháp của thành phố nổi chưa được chọn.",
+        "idea_state": {
+          "genre": "suspense",
+          "tone": "Ấm áp, có hài khô.",
+          "protagonist": "Một nữ pháp y.",
+          "core_concept": "Một nữ pháp y điều tra án mạng trong thành phố nổi.",
+          "setting": "Thành phố nổi.",
+          "conflict": "Điều tra bằng suy luận từ dấu vết vật lý.",
+          "constraints": [
+            "Không mất trí nhớ.",
+            "Không thêm tuyến tình cảm."
+          ],
+          "open_questions": [
+            "Thành phố nổi vận hành bằng công nghệ hay ma pháp?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "append_late_world_rule",
+      "prompt_id": "architect.world_rules.v1",
+      "request": {
+        "action": "append",
+        "language": "vi",
+        "base_idea_markdown": "# Thành phố nổi\nMột nữ pháp y điều tra án mạng trong thành phố nổi. Truyện tập trung vào suy luận vật lý và cái giá của an toàn tập thể. Nữ chính không tra tấn nghi phạm. Manh mối phải công bằng khi đọc lại; không giải án bằng bằng chứng đột ngột ở cuối. Không có twist toàn bộ chỉ là giấc mơ.",
+        "premise": {
+          "title": "Tầng Rơi Không Gió",
+          "logline": "Một nữ pháp y điều tra các thi thể rơi từ những tầng không có điểm rơi trong thành phố nổi. Càng lần theo dấu vết, cô càng phát hiện luật vận hành của thành phố đang che giấu một tội ác được hợp pháp hóa.",
+          "dramatic_question": "Cô có thể phơi bày sự thật mà không phá hủy nơi trú ẩn duy nhất của hàng triệu người không?",
+          "themes": [
+            "sự thật và trật tự",
+            "cái giá của an toàn tập thể"
+          ],
+          "tone_contract": [
+            "u tối vừa phải, tập trung suy luận và áp lực đạo đức",
+            "không sa vào gore",
+            "manh mối phải công bằng khi đọc lại"
+          ],
+          "hard_constraints": [
+            "Nhân vật chính không tra tấn nghi phạm để lấy lời khai.",
+            "Lời giải vụ án không dựa vào bằng chứng xuất hiện đột ngột ở cuối."
+          ],
+          "non_goals": [
+            "Không biến truyện thành kinh dị sinh tồn thuần túy.",
+            "Không dùng twist phủ nhận toàn bộ vụ án là giấc mơ."
+          ]
+        },
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "existing_world_rules": [
+          {
+            "world_rule_id": "rule_0001",
+            "category": "city_physics",
+            "summary": "Cầu và thang giữa các tầng tự khóa khi chênh lệch độ cao vượt ngưỡng an toàn.",
+            "content": "Mỗi tầng nổi được giữ độ cao bằng lõi khí. Cầu treo và thang khí nối các tầng sẽ tự ngắt khi chênh lệch độ cao vượt ngưỡng an toàn, để tránh kéo hỏng kết cấu. Người ở mỗi tầng có thể thấy tín hiệu khóa tại đầu cầu.",
+            "boundary": "Ngắt cầu chỉ chặn đường đi thông thường; không tạo lá chắn và không ngăn vật thể rơi qua khoảng trống. Muốn di chuyển lúc cầu khóa cần phương tiện khác đã được thiết lập.",
+            "effective_from_chapter": 1,
+            "visibility": "writer_safe",
+            "writer_projection": "Lõi khí giữ các tầng nổi ở độ cao riêng. Khi chênh lệch vượt ngưỡng an toàn, cầu và thang nối tầng tự khóa, có tín hiệu tại đầu cầu. Khóa không ngăn vật thể rơi qua khoảng trống; không tự thêm phương tiện vượt khóa.",
+            "author_only": {}
+          }
+        ],
+        "assigned_world_rule_ids": [
+          "rule_0100"
+        ],
+        "effective_from_chapter": 100,
+        "user_instruction": "Từ chương 100, thêm quy định mới: đi qua cầu nối tầng phải có giấy phép kiểm định. Không thay luật vật lý cũ."
+      },
+      "expected_response": {
+        "world_rules": [
+          {
+            "world_rule_id": "rule_0100",
+            "category": "access_control",
+            "summary": "Qua cầu nối tầng cần giấy phép kiểm định.",
+            "content": "Từ chương 100, người gác cầu kiểm tra giấy phép kiểm định trước khi cho qua cầu nối tầng.",
+            "boundary": "Giấy phép chỉ cho quyền qua cầu khi cầu mở; không vô hiệu cơ chế khóa an toàn.",
+            "effective_from_chapter": 100,
+            "visibility": "writer_safe",
+            "writer_projection": "Từ chương 100, qua cầu nối tầng cần giấy phép kiểm định; giấy phép không mở được cầu đang khóa an toàn.",
+            "author_only": {}
+          }
+        ]
+      }
+    },
+    {
+      "id": "foreshadow_without_planning_ids",
+      "prompt_id": "architect.foreshadow.v1",
+      "request": {
+        "action": "generate",
+        "language": "vi",
+        "base_idea_markdown": "# Thành phố nổi\nMột nữ pháp y điều tra án mạng trong thành phố nổi. Truyện tập trung vào suy luận vật lý và cái giá của an toàn tập thể. Nữ chính không tra tấn nghi phạm. Manh mối phải công bằng khi đọc lại; không giải án bằng bằng chứng đột ngột ở cuối. Không có twist toàn bộ chỉ là giấc mơ.",
+        "premise": {
+          "title": "Tầng Rơi Không Gió",
+          "logline": "Một nữ pháp y điều tra các thi thể rơi từ những tầng không có điểm rơi trong thành phố nổi. Càng lần theo dấu vết, cô càng phát hiện luật vận hành của thành phố đang che giấu một tội ác được hợp pháp hóa.",
+          "dramatic_question": "Cô có thể phơi bày sự thật mà không phá hủy nơi trú ẩn duy nhất của hàng triệu người không?",
+          "themes": [
+            "sự thật và trật tự",
+            "cái giá của an toàn tập thể"
+          ],
+          "tone_contract": [
+            "u tối vừa phải, tập trung suy luận và áp lực đạo đức",
+            "không sa vào gore",
+            "manh mối phải công bằng khi đọc lại"
+          ],
+          "hard_constraints": [
+            "Nhân vật chính không tra tấn nghi phạm để lấy lời khai.",
+            "Lời giải vụ án không dựa vào bằng chứng xuất hiện đột ngột ở cuối."
+          ],
+          "non_goals": [
+            "Không biến truyện thành kinh dị sinh tồn thuần túy.",
+            "Không dùng twist phủ nhận toàn bộ vụ án là giấc mơ."
+          ]
+        },
+        "characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Lâm An",
+            "aliases": [
+              "Bác sĩ Lâm"
+            ],
+            "role": "protagonist",
+            "tier": "core",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Nữ pháp y tỉ mỉ, nổi tiếng vì tái dựng hiện trường từ dấu vết rất nhỏ.",
+              "traits": [
+                "kiên nhẫn",
+                "khó tin người",
+                "tôn trọng chứng cứ"
+              ],
+              "voice": "ngắn, chính xác, ít dùng cảm thán",
+              "known_history": "Từng làm ở tầng đáy thành phố trước khi chuyển lên cơ quan pháp y trung tâm."
+            },
+            "writer_profile": {
+              "dialogue_style": "đặt câu hỏi trực diện, hiếm khi giải thích cảm xúc của mình",
+              "behavior_notes": [
+                "quan sát tay và giày của người đối diện",
+                "ghi chú bằng ký hiệu riêng"
+              ],
+              "do_not_write": [
+                "không hành động bốc đồng nếu chưa có áp lực đủ lớn"
+              ]
+            },
+            "author_only": {
+              "secret": "Ký ức về một vụ rơi tầng cũ của cô đã bị chỉnh sửa."
+            },
+            "future_direction": {
+              "arc_hint": "Từ người chỉ tin chứng cứ vật lý sang người dám tin lời khai đau đớn của nạn nhân sống sót."
+            }
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Tạ Minh",
+            "aliases": [],
+            "role": "ally",
+            "tier": "major",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Kỹ sư bảo trì khí cầu hiểu rõ các đường gió cấm và thói quen vận hành tầng nổi.",
+              "traits": [
+                "thực tế",
+                "nói nhiều khi căng thẳng",
+                "trung thành với đội của mình"
+              ],
+              "voice": "bình dân, hay ví von bằng máy móc",
+              "known_history": "Lớn lên ở khu bảo trì, quen với tầng thấp và các đường đi không chính thức."
+            },
+            "writer_profile": {
+              "dialogue_style": "nói vòng qua chuyện kỹ thuật rồi mới vào ý chính",
+              "behavior_notes": [
+                "kiểm tra móc dây an toàn theo thói quen"
+              ],
+              "do_not_write": [
+                "không biến anh thành comic relief đơn thuần"
+              ]
+            },
+            "author_only": {},
+            "future_direction": {
+              "relationship_with_protagonist": "Từ người cung cấp thông tin sang đồng minh dám phản lại hệ thống bảo trì."
+            }
+          }
+        ],
+        "world_rules": [
+          {
+            "world_rule_id": "rule_0001",
+            "category": "city_physics",
+            "summary": "Cầu và thang giữa các tầng tự khóa khi chênh lệch độ cao vượt ngưỡng an toàn.",
+            "content": "Mỗi tầng nổi được giữ độ cao bằng lõi khí. Cầu treo và thang khí nối các tầng sẽ tự ngắt khi chênh lệch độ cao vượt ngưỡng an toàn, để tránh kéo hỏng kết cấu. Người ở mỗi tầng có thể thấy tín hiệu khóa tại đầu cầu.",
+            "boundary": "Ngắt cầu chỉ chặn đường đi thông thường; không tạo lá chắn và không ngăn vật thể rơi qua khoảng trống. Muốn di chuyển lúc cầu khóa cần phương tiện khác đã được thiết lập.",
+            "effective_from_chapter": 1,
+            "visibility": "writer_safe",
+            "writer_projection": "Lõi khí giữ các tầng nổi ở độ cao riêng. Khi chênh lệch vượt ngưỡng an toàn, cầu và thang nối tầng tự khóa, có tín hiệu tại đầu cầu. Khóa không ngăn vật thể rơi qua khoảng trống; không tự thêm phương tiện vượt khóa.",
+            "author_only": {}
+          }
+        ],
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "existing_foreshadows": [],
+        "assigned_foreshadow_ids": [
+          "fs_0001"
+        ],
+        "effective_from_chapter": 1,
+        "user_instruction": "Gieo một manh mối liên quan ký ức nữ chính."
+      },
+      "expected_response": {
+        "foreshadows": [
+          {
+            "foreshadow_id": "fs_0001",
+            "label": "Ký hiệu trong sổ pháp y cũ",
+            "truth_author_only": {
+              "truth": "Lâm An từng ghi ký hiệu này sau vụ rơi tầng cũ, thuộc phần ký ức đã bị chỉnh sửa.",
+              "surface_candidate": "Một ký hiệu trong sổ pháp y cũ khiến Lâm An dừng tay; cô chưa gọi tên được cảm giác quen thuộc.",
+              "payoff_intent": "Khi truyện cho phép đối chiếu sổ cũ với quá khứ, chi tiết này góp phần cho thấy cô từng tiếp xúc vụ việc; riêng cảm giác quen không đủ làm bằng chứng."
+            },
+            "planned_planting": [],
+            "planned_payoff": null,
+            "effective_from_chapter": 1,
+            "writer_visibility": "skeleton_only",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "id": "missing_character_ids",
+      "prompt_id": "architect.characters.v1",
+      "request": {
+        "action": "generate",
+        "language": "vi",
+        "base_idea_markdown": "# Thành phố nổi\nMột nữ pháp y điều tra án mạng trong thành phố nổi. Truyện tập trung vào suy luận vật lý và cái giá của an toàn tập thể. Nữ chính không tra tấn nghi phạm. Manh mối phải công bằng khi đọc lại; không giải án bằng bằng chứng đột ngột ở cuối. Không có twist toàn bộ chỉ là giấc mơ.",
+        "premise": {
+          "title": "Tầng Rơi Không Gió",
+          "logline": "Một nữ pháp y điều tra các thi thể rơi từ những tầng không có điểm rơi trong thành phố nổi. Càng lần theo dấu vết, cô càng phát hiện luật vận hành của thành phố đang che giấu một tội ác được hợp pháp hóa.",
+          "dramatic_question": "Cô có thể phơi bày sự thật mà không phá hủy nơi trú ẩn duy nhất của hàng triệu người không?",
+          "themes": [
+            "sự thật và trật tự",
+            "cái giá của an toàn tập thể"
+          ],
+          "tone_contract": [
+            "u tối vừa phải, tập trung suy luận và áp lực đạo đức",
+            "không sa vào gore",
+            "manh mối phải công bằng khi đọc lại"
+          ],
+          "hard_constraints": [
+            "Nhân vật chính không tra tấn nghi phạm để lấy lời khai.",
+            "Lời giải vụ án không dựa vào bằng chứng xuất hiện đột ngột ở cuối."
+          ],
+          "non_goals": [
+            "Không biến truyện thành kinh dị sinh tồn thuần túy.",
+            "Không dùng twist phủ nhận toàn bộ vụ án là giấc mơ."
+          ]
+        },
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "existing_characters": [],
+        "assigned_character_ids": [],
+        "effective_from_chapter": 1,
+        "user_instruction": "Tạo nữ chính và một đồng minh trong đội bảo trì khí cầu. Tôi muốn nữ chính có một phần ký ức vụ rơi tầng cũ bị chỉnh sửa; đây là bí mật chưa lộ, không ghi vào profile Writer."
+      },
+      "expected_handling": "Backend chặn trước request; nếu prompt vẫn bị gọi thì characters rỗng, không ID tạm, không accepted merge."
+    },
+    {
+      "id": "conflicting_downstream_request",
+      "prompt_id": "architect.premise.v1",
+      "request": {
+        "action": "generate",
+        "language": "vi",
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "base_idea_markdown": "# Thành phố nổi\nMột nữ pháp y điều tra án mạng trong thành phố nổi. Truyện tập trung vào suy luận vật lý và cái giá của an toàn tập thể. Nữ chính không tra tấn nghi phạm. Manh mối phải công bằng khi đọc lại; không giải án bằng bằng chứng đột ngột ở cuối. Không có twist toàn bộ chỉ là giấc mơ.",
+        "user_instruction": "Cho nữ chính tra tấn nghi phạm như phương pháp điều tra thường xuyên.",
+        "previous_premise": null
+      },
+      "expected_handling": "Giữ constraint không tra tấn của Base Idea; không biến yêu cầu trái authority thành premise."
+    },
+    {
+      "id": "secret_in_negative_instruction",
+      "prompt_id": "architect.characters.v1",
+      "request": {
+        "action": "generate",
+        "language": "vi",
+        "base_idea_markdown": "# Thành phố nổi\nMột nữ pháp y điều tra án mạng trong thành phố nổi. Truyện tập trung vào suy luận vật lý và cái giá của an toàn tập thể. Nữ chính không tra tấn nghi phạm. Manh mối phải công bằng khi đọc lại; không giải án bằng bằng chứng đột ngột ở cuối. Không có twist toàn bộ chỉ là giấc mơ.",
+        "premise": {
+          "title": "Tầng Rơi Không Gió",
+          "logline": "Một nữ pháp y điều tra các thi thể rơi từ những tầng không có điểm rơi trong thành phố nổi. Càng lần theo dấu vết, cô càng phát hiện luật vận hành của thành phố đang che giấu một tội ác được hợp pháp hóa.",
+          "dramatic_question": "Cô có thể phơi bày sự thật mà không phá hủy nơi trú ẩn duy nhất của hàng triệu người không?",
+          "themes": [
+            "sự thật và trật tự",
+            "cái giá của an toàn tập thể"
+          ],
+          "tone_contract": [
+            "u tối vừa phải, tập trung suy luận và áp lực đạo đức",
+            "không sa vào gore",
+            "manh mối phải công bằng khi đọc lại"
+          ],
+          "hard_constraints": [
+            "Nhân vật chính không tra tấn nghi phạm để lấy lời khai.",
+            "Lời giải vụ án không dựa vào bằng chứng xuất hiện đột ngột ở cuối."
+          ],
+          "non_goals": [
+            "Không biến truyện thành kinh dị sinh tồn thuần túy.",
+            "Không dùng twist phủ nhận toàn bộ vụ án là giấc mơ."
+          ]
+        },
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "existing_characters": [],
+        "assigned_character_ids": [
+          "char_0001",
+          "char_0002"
+        ],
+        "effective_from_chapter": 1,
+        "user_instruction": "Tạo hai nhân vật như yêu cầu, bí mật ký ức vẫn author-only. Đừng để Writer biết nó."
+      },
+      "expected_handling": "Không đặt bí mật cả dưới dạng phủ định trong public_profile, writer_profile, role hoặc aliases."
+    },
+    {
+      "id": "co_create_repeat_full_brief",
+      "prompt_id": "co_create.v1",
+      "request": {
+        "language": "vi",
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "conversation_summary": "Đã chọn suy luận vật lý, tone ấm áp có hài khô, không mất trí nhớ; chưa chọn cơ chế thành phố nổi.",
+        "current_idea_state": {
+          "genre": "suspense",
+          "tone": "Ấm áp, có hài khô.",
+          "protagonist": "Một nữ pháp y.",
+          "core_concept": "Một nữ pháp y điều tra án mạng trong thành phố nổi.",
+          "setting": "Thành phố nổi.",
+          "conflict": "Điều tra bằng suy luận từ dấu vết vật lý.",
+          "constraints": [
+            "Không mất trí nhớ.",
+            "Không thêm tuyến tình cảm."
+          ],
+          "open_questions": [
+            "Thành phố nổi vận hành bằng công nghệ hay ma pháp?"
+          ]
+        },
+        "user_message": "Nhắc lại bản brief, tôi chưa đổi gì."
+      },
+      "expected_response": {
+        "message": "Dưới đây là brief đầy đủ hiện tại.\n\n## Ý tưởng hiện tại\n- Nữ pháp y điều tra án mạng trong thành phố nổi bằng dấu vết vật lý.\n\n## Nhân vật và xung đột\n- Nhân vật trung tâm là nữ pháp y, cần làm rõ vụ án.\n\n## Bối cảnh và sắc thái\n- Thành phố nổi; ấm áp, có hài khô.\n\n## Ràng buộc đã chốt\n- Không mất trí nhớ.\n- Không thêm tuyến tình cảm.\n\n## Điều còn mở\n- Cơ chế công nghệ hay ma pháp của thành phố nổi chưa được chọn.",
+        "idea_state": {
+          "genre": "suspense",
+          "tone": "Ấm áp, có hài khô.",
+          "protagonist": "Một nữ pháp y.",
+          "core_concept": "Một nữ pháp y điều tra án mạng trong thành phố nổi.",
+          "setting": "Thành phố nổi.",
+          "conflict": "Điều tra bằng suy luận từ dấu vết vật lý.",
+          "constraints": [
+            "Không mất trí nhớ.",
+            "Không thêm tuyến tình cảm."
+          ],
+          "open_questions": [
+            "Thành phố nổi vận hành bằng công nghệ hay ma pháp?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "edit_preserves_identity_and_other_fields",
+      "prompt_id": "architect.characters.v1",
+      "request": {
+        "action": "edit",
+        "language": "vi",
+        "base_idea_markdown": "# Thành phố nổi\nMột nữ pháp y điều tra án mạng trong thành phố nổi. Truyện tập trung vào suy luận vật lý và cái giá của an toàn tập thể. Nữ chính không tra tấn nghi phạm. Manh mối phải công bằng khi đọc lại; không giải án bằng bằng chứng đột ngột ở cuối. Không có twist toàn bộ chỉ là giấc mơ.",
+        "premise": {
+          "title": "Tầng Rơi Không Gió",
+          "logline": "Một nữ pháp y điều tra các thi thể rơi từ những tầng không có điểm rơi trong thành phố nổi. Càng lần theo dấu vết, cô càng phát hiện luật vận hành của thành phố đang che giấu một tội ác được hợp pháp hóa.",
+          "dramatic_question": "Cô có thể phơi bày sự thật mà không phá hủy nơi trú ẩn duy nhất của hàng triệu người không?",
+          "themes": [
+            "sự thật và trật tự",
+            "cái giá của an toàn tập thể"
+          ],
+          "tone_contract": [
+            "u tối vừa phải, tập trung suy luận và áp lực đạo đức",
+            "không sa vào gore",
+            "manh mối phải công bằng khi đọc lại"
+          ],
+          "hard_constraints": [
+            "Nhân vật chính không tra tấn nghi phạm để lấy lời khai.",
+            "Lời giải vụ án không dựa vào bằng chứng xuất hiện đột ngột ở cuối."
+          ],
+          "non_goals": [
+            "Không biến truyện thành kinh dị sinh tồn thuần túy.",
+            "Không dùng twist phủ nhận toàn bộ vụ án là giấc mơ."
+          ]
+        },
+        "genre_prompt": "Genre Prompt: Suspense...",
+        "existing_characters": [
+          {
+            "character_id": "char_0001",
+            "display_name": "Lâm An",
+            "aliases": [
+              "Bác sĩ Lâm"
+            ],
+            "role": "protagonist",
+            "tier": "core",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Nữ pháp y tỉ mỉ, nổi tiếng vì tái dựng hiện trường từ dấu vết rất nhỏ.",
+              "traits": [
+                "kiên nhẫn",
+                "khó tin người",
+                "tôn trọng chứng cứ"
+              ],
+              "voice": "ngắn, chính xác, ít dùng cảm thán",
+              "known_history": "Từng làm ở tầng đáy thành phố trước khi chuyển lên cơ quan pháp y trung tâm."
+            },
+            "writer_profile": {
+              "dialogue_style": "đặt câu hỏi trực diện, hiếm khi giải thích cảm xúc của mình",
+              "behavior_notes": [
+                "quan sát tay và giày của người đối diện",
+                "ghi chú bằng ký hiệu riêng"
+              ],
+              "do_not_write": [
+                "không hành động bốc đồng nếu chưa có áp lực đủ lớn"
+              ]
+            },
+            "author_only": {
+              "secret": "Ký ức về một vụ rơi tầng cũ của cô đã bị chỉnh sửa."
+            },
+            "future_direction": {
+              "arc_hint": "Từ người chỉ tin chứng cứ vật lý sang người dám tin lời khai đau đớn của nạn nhân sống sót."
+            }
+          },
+          {
+            "character_id": "char_0002",
+            "display_name": "Tạ Minh",
+            "aliases": [],
+            "role": "ally",
+            "tier": "major",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Kỹ sư bảo trì khí cầu hiểu rõ các đường gió cấm và thói quen vận hành tầng nổi.",
+              "traits": [
+                "thực tế",
+                "nói nhiều khi căng thẳng",
+                "trung thành với đội của mình"
+              ],
+              "voice": "bình dân, hay ví von bằng máy móc",
+              "known_history": "Lớn lên ở khu bảo trì, quen với tầng thấp và các đường đi không chính thức."
+            },
+            "writer_profile": {
+              "dialogue_style": "nói vòng qua chuyện kỹ thuật rồi mới vào ý chính",
+              "behavior_notes": [
+                "kiểm tra móc dây an toàn theo thói quen"
+              ],
+              "do_not_write": [
+                "không biến anh thành comic relief đơn thuần"
+              ]
+            },
+            "author_only": {},
+            "future_direction": {
+              "relationship_with_protagonist": "Từ người cung cấp thông tin sang đồng minh dám phản lại hệ thống bảo trì."
+            }
+          }
+        ],
+        "assigned_character_ids": [
+          "char_0002"
+        ],
+        "effective_from_chapter": 1,
+        "user_instruction": "Chỉ đổi tên hiển thị char_0002 thành Tạ Bình; giữ nguyên phần khác."
+      },
+      "expected_response": {
+        "characters": [
+          {
+            "character_id": "char_0002",
+            "display_name": "Tạ Bình",
+            "aliases": [],
+            "role": "ally",
+            "tier": "major",
+            "effective_from_chapter": 1,
+            "status": "accepted",
+            "public_profile": {
+              "description": "Kỹ sư bảo trì khí cầu hiểu rõ các đường gió cấm và thói quen vận hành tầng nổi.",
+              "traits": [
+                "thực tế",
+                "nói nhiều khi căng thẳng",
+                "trung thành với đội của mình"
+              ],
+              "voice": "bình dân, hay ví von bằng máy móc",
+              "known_history": "Lớn lên ở khu bảo trì, quen với tầng thấp và các đường đi không chính thức."
+            },
+            "writer_profile": {
+              "dialogue_style": "nói vòng qua chuyện kỹ thuật rồi mới vào ý chính",
+              "behavior_notes": [
+                "kiểm tra móc dây an toàn theo thói quen"
+              ],
+              "do_not_write": [
+                "không biến anh thành comic relief đơn thuần"
+              ]
+            },
+            "author_only": {},
+            "future_direction": {
+              "relationship_with_protagonist": "Từ người cung cấp thông tin sang đồng minh dám phản lại hệ thống bảo trì."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

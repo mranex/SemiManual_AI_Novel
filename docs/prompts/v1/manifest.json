@@ -1,0 +1,373 @@
+{
+  "manifest_version": 1,
+  "path_base": "repository_root",
+  "input_mode": "json_message",
+  "unknown_prompt_policy": "error",
+  "reference_policy": "explicit_only",
+  "prompts": [
+    {
+      "prompt_id": "co_create.v1",
+      "template": "docs/prompts/v1/co_create.md",
+      "template_variables": [
+        "language",
+        "genre_prompt",
+        "conversation_summary",
+        "current_idea_state",
+        "user_message"
+      ],
+      "output_kind": "json",
+      "schema_ref": "IdeaStateResponse",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "1.5",
+      "reference_selection": [
+        {
+          "input_field": "genre_prompt",
+          "registry": "genres",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "architect.premise.v1",
+      "template": "docs/prompts/v1/architect/premise.md",
+      "template_variables": [
+        "action",
+        "language",
+        "genre_prompt",
+        "base_idea_markdown",
+        "user_instruction",
+        "previous_premise"
+      ],
+      "output_kind": "json",
+      "schema_ref": "PremisePayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "2.1",
+      "reference_selection": [
+        {
+          "input_field": "genre_prompt",
+          "registry": "genres",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "architect.characters.v1",
+      "template": "docs/prompts/v1/architect/characters.md",
+      "template_variables": [
+        "action",
+        "language",
+        "base_idea_markdown",
+        "premise",
+        "genre_prompt",
+        "existing_characters",
+        "assigned_character_ids",
+        "effective_from_chapter",
+        "user_instruction"
+      ],
+      "output_kind": "json",
+      "schema_ref": "CharactersPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "2.2",
+      "reference_selection": [
+        {
+          "input_field": "genre_prompt",
+          "registry": "genres",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "architect.world_rules.v1",
+      "template": "docs/prompts/v1/architect/world_rules.md",
+      "template_variables": [
+        "action",
+        "language",
+        "base_idea_markdown",
+        "premise",
+        "genre_prompt",
+        "existing_world_rules",
+        "assigned_world_rule_ids",
+        "effective_from_chapter",
+        "user_instruction"
+      ],
+      "output_kind": "json",
+      "schema_ref": "WorldRulesPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "2.3",
+      "reference_selection": [
+        {
+          "input_field": "genre_prompt",
+          "registry": "genres",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "architect.foreshadow.v1",
+      "template": "docs/prompts/v1/architect/foreshadow.md",
+      "template_variables": [
+        "action",
+        "language",
+        "base_idea_markdown",
+        "premise",
+        "characters",
+        "world_rules",
+        "genre_prompt",
+        "existing_foreshadows",
+        "assigned_foreshadow_ids",
+        "effective_from_chapter",
+        "user_instruction"
+      ],
+      "output_kind": "json",
+      "schema_ref": "ForeshadowPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "2.4",
+      "reference_selection": [
+        {
+          "input_field": "genre_prompt",
+          "registry": "genres",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "long_plan.v1",
+      "template": "docs/prompts/v1/long_plan.md",
+      "template_variables": [
+        "action",
+        "language",
+        "genre_prompt",
+        "base_idea_markdown",
+        "premise",
+        "characters",
+        "world_rules",
+        "foreshadows",
+        "relationships_as_of",
+        "planning_scope",
+        "assigned_volume_ids",
+        "assigned_arc_ids",
+        "previous_long_plan",
+        "user_instruction"
+      ],
+      "output_kind": "json",
+      "schema_ref": "LongPlanPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "3.1",
+      "reference_selection": [
+        {
+          "input_field": "genre_prompt",
+          "registry": "genres",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "short_plan.v1",
+      "template": "docs/prompts/v1/short_plan.md",
+      "template_variables": [
+        "action",
+        "language",
+        "base_idea_markdown",
+        "premise",
+        "current_arc",
+        "characters",
+        "world_rules",
+        "foreshadows",
+        "timeline_as_of",
+        "relationships_as_of",
+        "recent_finalized_summaries",
+        "assigned_chapters",
+        "chapter_constraints",
+        "context_basis",
+        "previous_short_plan",
+        "user_instruction"
+      ],
+      "output_kind": "json",
+      "schema_ref": "ShortPlanPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "3.2",
+      "reference_selection": []
+    },
+    {
+      "prompt_id": "rolling_plan.v1",
+      "template": "docs/prompts/v1/rolling_plan.md",
+      "template_variables": [
+        "current_arc",
+        "current_short_plan",
+        "timeline_as_of",
+        "relationships_as_of",
+        "recent_finalized_summaries",
+        "reviewed_chapter_range",
+        "latest_consistent_chapter",
+        "eligible_chapters",
+        "allow_relationship_replan",
+        "user_instruction"
+      ],
+      "output_kind": "json",
+      "schema_ref": "RollingPatchPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "6.5",
+      "reference_selection": []
+    },
+    {
+      "prompt_id": "skeleton.v1",
+      "template": "docs/prompts/v1/skeleton.md",
+      "template_variables": [
+        "action",
+        "base_idea_constraints",
+        "premise_constraints",
+        "current_arc",
+        "chapter_plan",
+        "timeline_as_of",
+        "relationships_as_of",
+        "previous_final_summary",
+        "characters",
+        "world_rules",
+        "foreshadows",
+        "assigned_section_ids",
+        "context_basis",
+        "previous_skeleton",
+        "user_instruction"
+      ],
+      "output_kind": "json",
+      "schema_ref": "SkeletonPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "4",
+      "reference_selection": []
+    },
+    {
+      "prompt_id": "writer.v1",
+      "template": "docs/prompts/v1/writer.md",
+      "template_variables": [
+        "chapter_id",
+        "chapter_number",
+        "title",
+        "base_idea_constraints",
+        "premise_constraints",
+        "skeleton",
+        "characters",
+        "world_rules",
+        "timeline_as_of",
+        "relationships_as_of",
+        "previous_final_summary",
+        "style",
+        "user_instruction"
+      ],
+      "output_kind": "markdown",
+      "schema_ref": "MarkdownProse",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "5.1",
+      "reference_selection": [
+        {
+          "input_field": "style",
+          "registry": "styles",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "review.v1",
+      "template": "docs/prompts/v1/review.md",
+      "template_variables": [
+        "chapter_id",
+        "prose_revision",
+        "prose_markdown",
+        "constraint_sources",
+        "skeleton",
+        "characters",
+        "world_rules",
+        "timeline_as_of",
+        "relationships_as_of",
+        "previous_final_summary",
+        "style",
+        "review_focus"
+      ],
+      "output_kind": "json",
+      "schema_ref": "ReviewReportPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "5.2",
+      "reference_selection": [
+        {
+          "input_field": "style",
+          "registry": "styles",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "rewrite_section.v1",
+      "template": "docs/prompts/v1/rewrite_section.md",
+      "template_variables": [
+        "request",
+        "target_markdown",
+        "surrounding_before",
+        "surrounding_after",
+        "skeleton",
+        "base_idea_constraints",
+        "premise_constraints",
+        "characters",
+        "world_rules",
+        "timeline_as_of",
+        "relationships_as_of",
+        "style"
+      ],
+      "output_kind": "json",
+      "schema_ref": "RewriteSectionPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "5.3",
+      "reference_selection": [
+        {
+          "input_field": "style",
+          "registry": "styles",
+          "selection": "exactly_one"
+        }
+      ]
+    },
+    {
+      "prompt_id": "reconcile.v1",
+      "template": "docs/prompts/v1/reconcile.md",
+      "template_variables": [
+        "chapter_id",
+        "chapter_number",
+        "source_final_candidate",
+        "final_candidate_markdown",
+        "timeline_as_of",
+        "relationships_as_of",
+        "known_characters"
+      ],
+      "output_kind": "json",
+      "schema_ref": "ReconciliationPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "6.4",
+      "reference_selection": []
+    },
+    {
+      "prompt_id": "retcon_impact.v1",
+      "template": "docs/prompts/v1/retcon_impact.md",
+      "template_variables": [
+        "source_change",
+        "before_content",
+        "after_content",
+        "downstream_items",
+        "state_before_change",
+        "analysis_scope"
+      ],
+      "output_kind": "json",
+      "schema_ref": "ImpactReportPayload",
+      "schema_document": "docs/design/schemas.md",
+      "schema_section": "6.6",
+      "reference_selection": []
+    }
+  ],
+  "genres": {
+    "xianxia": "docs/genres/xianxia.md",
+    "wuxia": "docs/genres/wuxia.md",
+    "fantasy": "docs/genres/fantasy.md",
+    "romance": "docs/genres/romance.md",
+    "suspense": "docs/genres/suspense.md",
+    "custom": "docs/genres/custom.md"
+  },
+  "styles": {
+    "default": "docs/styles/v1/default.md"
+  }
+}

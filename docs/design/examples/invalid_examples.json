@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "invalid_cases": [
+    {
+      "case_id": "relationship_uses_display_names",
+      "payload": {
+        "relationship_id": "rel_bad_0001",
+        "character_a": "Sở Dương",
+        "character_b": "Tiêu Như Ngọc",
+        "current": "Dè chừng lẫn nhau",
+        "last_updated_chapter": 2
+      },
+      "expected_errors": [
+        {
+          "path": "/payload/character_a",
+          "code": "display_name_as_foreign_key",
+          "message": "Relationship must use character_ids, not display names."
+        }
+      ]
+    },
+    {
+      "case_id": "future_lore_leaks_into_past_context",
+      "payload": {
+        "for_chapter_number": 20,
+        "effective_world_rule_ids": [
+          "rule_0001",
+          "rule_0100"
+        ]
+      },
+      "known_world_rules": [
+        {
+          "world_rule_id": "rule_0100",
+          "effective_from_chapter": 100
+        }
+      ],
+      "expected_errors": [
+        {
+          "path": "/payload/effective_world_rule_ids/1",
+          "code": "effective_from_future",
+          "message": "rule_0100 is effective from chapter 100 and cannot be included in chapter 20 context."
+        }
+      ]
+    },
+    {
+      "case_id": "writer_context_contains_author_secret",
+      "payload": {
+        "chapter_id": "ch_0001",
+        "writer_context": {
+          "character_ids": [
+            "char_0001"
+          ],
+          "truth_author_only": "Cái nồi là mảnh vật phẩm cổ từng nhận chủ sai người."
+        }
+      },
+      "expected_errors": [
+        {
+          "path": "/payload/writer_context/truth_author_only",
+          "code": "secret_leak",
+          "message": "Writer context cannot contain author-only truth."
+        }
+      ]
+    },
+    {
+      "case_id": "short_plan_mutates_current_relationship",
+      "payload": {
+        "chapter_id": "ch_0002",
+        "relationship_updates": [
+          {
+            "relationship_id": "rel_0001",
+            "current": "Đã tin tưởng lẫn nhau"
+          }
+        ]
+      },
+      "expected_errors": [
+        {
+          "path": "/payload/relationship_updates/0/current",
+          "code": "plan_actual_state_mix",
+          "message": "Short Plan can contain relationship_changes as future direction, not current relationship updates."
+        }
+      ]
+    },
+    {
+      "case_id": "reconciliation_chapter_mismatch",
+      "payload": {
+        "chapter_id": "ch_0001",
+        "chapter_number": 2,
+        "timeline": {
+          "time": "Đêm",
+          "location": "Sườn núi",
+          "status": "Sai số chương."
+        },
+        "relationship_updates": []
+      },
+      "expected_errors": [
+        {
+          "path": "/payload/chapter_number",
+          "code": "chapter_mismatch",
+          "message": "chapter_id ch_0001 must have chapter_number 1."
+        }
+      ]
+    },
+    {
+      "case_id": "auto_accept_prose_finalize",
+      "payload": {
+        "auto_accept_structured": true,
+        "writer_output": "# Chương 1\n\nBản nháp prose.",
+        "requested_transition": "final_reconciled"
+      },
+      "expected_errors": [
+        {
+          "path": "/payload/requested_transition",
+          "code": "auto_accept_cannot_finalize_prose",
+          "message": "Auto Accept applies only to structured output and cannot finalize prose."
+        }
+      ]
+    }
+  ]
+}
+

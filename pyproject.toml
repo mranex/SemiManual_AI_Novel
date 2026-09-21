@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "manual-ai-novel"
+version = "0.0.1"
+description = "App local hỗ trợ viết tiểu thuyết theo workflow human-in-the-loop (MVP, dùng file JSON/Markdown; xem README để biết giới hạn)."
+readme = "README.md"
+# T07: chốt Python 3.12 cho MVP (đã kiểm tra với 3.12.9).
+requires-python = ">=3.12,<3.13"
+license = { text = "Proprietary" }
+
+# Cơ chế khóa phiên bản tái lập của MVP: pin trực tiếp bằng "==", không thêm
+# lock file/tool ngoài (giữ đơn giản theo spec). Khi cần nâng cấp, sửa pin và
+# chạy lại toàn bộ pytest.
+dependencies = [
+    "streamlit==1.41.1",
+    "pydantic==2.11.7",
+    "python-dotenv==1.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+]
+
+[project.scripts]
+novel-ai-config = "novel_ai.config:main"
+
+[tool.setuptools.packages.find]
+include = ["novel_ai*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Cho phép `python -m pytest` chạy trực tiếp từ repo mà không cần cài editable.
+pythonpath = ["."]
+addopts = "-q"
