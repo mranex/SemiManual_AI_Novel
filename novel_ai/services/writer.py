@@ -43,6 +43,7 @@ from typing import Any, Callable, Iterable
 from novel_ai import config as app_config
 from novel_ai.core import storage, validation
 from novel_ai.core.context import ContextBundle, ContextError, build_writer_context
+from novel_ai.core.generation import TERMINAL_STATES, EventSink, GenerationEmitter
 from novel_ai.core.llm import (
     LLMClient,
     LLMError,
@@ -314,12 +315,15 @@ def _collect_stream(
     client: LLMClient,
     request: LLMRequest,
     on_chunk: Callable[[StreamChunk], None] | None,
+    *,
+    emitter: GenerationEmitter | None = None,
 ) -> tuple[str, str]:
     """Cộng dồn prose từ stream; trả `(text, terminal_status)`.
 
     Lỗi transport sau khi đã có delta → giữ phần đã nhận với status `partial`
-    (stream đứt không bao giờ thành `completed`). Lỗi trước delta nào → raise
-    `LLMUnavailableError` vì chưa có gì để lưu.
+    (stream đứt không bao giờ thành `completed`). Lỗi trước delta nào → status
+    `error` để caller phát `error` và raise (chưa có gì để lưu). Mỗi delta cũng
+    được phát thành `GenerationEvent` nếu có `emitter` (T33).
     """
     parts: list[str] = []
     status = "partial"
@@ -327,6 +331,8 @@ def _collect_stream(
         for chunk in stream_text(client, request):
             if chunk.status == "delta":
                 parts.append(chunk.text)
+                if emitter is not None:
+                    emitter.delta(chunk.text)
                 if on_chunk is not None:
                     on_chunk(chunk)
                 continue
@@ -425,6 +431,8 @@ def _run_generation(
     user_instruction: str = "",
     stream: bool = False,
     on_chunk: Callable[[StreamChunk], None] | None = None,
+    on_event: EventSink | None = None,
+    attempt: int = 1,
     operation_id: str | None = None,
     now: str | None = None,
     continuation_of: str | None = None,
@@ -432,9 +440,21 @@ def _run_generation(
     stamp = now or now_iso()
     op_id = operation_id or generate_operation_id()
     chapter = _require_editable_chapter(project, chapter_id)
+    emitter = GenerationEmitter(
+        operation_id=op_id,
+        action=operation_type,
+        sink=on_event,
+        attempt=attempt,
+        prompt_id=DRAFT_PROMPT_ID,
+        artifact_id=f"draft_{chapter_id}",
+        chapter_id=chapter_id,
+    )
 
     existing = _load_operation_record(project, chapter_id, op_id)
     if existing is not None:
+        # Replay operation đã lưu: không gọi LLM, không ghi thêm. UI nhận `saved`
+        # để không hiển thị như đang chạy (T33, D019).
+        emitter.replay(detail="Operation đã hoàn tất trước đó; replay theo operation_id.")
         return _replay_result(existing, action=operation_type)
 
     # Guard backend chạy trước khi client được gọi (D011).
@@ -449,105 +469,139 @@ def _run_generation(
     )
 
     if stream:
-        text, stream_status = _collect_stream(client, request, on_chunk)
+        emitter.start_streaming(detail=f"Đang stream draft cho `{chapter_id}`.")
+        try:
+            text, stream_status = _collect_stream(client, request, on_chunk, emitter=emitter)
+        except LLMUnavailableError:
+            # Lỗi trước delta: chưa có gì để lưu, không tạo raw/record.
+            emitter.fail(detail="Stream lỗi trước khi có prose; draft cũ giữ nguyên.")
+            raise
+        if stream_status == "error":
+            emitter.fail(detail="Stream lỗi trước khi có prose; chưa có gì để lưu.")
+            raise LLMUnavailableError(
+                "LLM lỗi trước khi có prose; draft cũ giữ nguyên.",
+                code="stream_failed_before_delta",
+            )
+        emitter.transport_complete(detail=f"Stream kết thúc với status `{stream_status}`.")
     else:
+        emitter.start_non_streaming(
+            detail="Provider chạy non-streaming: không có delta để hiển thị."
+        )
         try:
             response = client.complete(request)
         except LLMError as exc:
+            emitter.fail(detail="LLM lỗi trước khi có prose; draft cũ giữ nguyên.")
             raise LLMUnavailableError(
                 f"LLM lỗi khi sinh draft: {exc}", code=exc.code, details=exc.details
             ) from exc
         text = response.text if isinstance(response.text, str) else str(response.text)
         stream_status = "completed"
+        emitter.transport_complete(detail="Đã nhận xong response (chưa validate).")
 
-    raw_ref = storage.save_raw_output(
-        project,
-        operation_id=op_id,
-        text=text,
-        label=f"writer_{chapter_id}",
-        day=_day_of(stamp),
-    )
+    emitter.validating(detail="Đang kiểm tra prose và ghi draft.")
+    try:
+        raw_ref = storage.save_raw_output(
+            project,
+            operation_id=op_id,
+            text=text,
+            label=f"writer_{chapter_id}",
+            day=_day_of(stamp),
+        )
 
-    warnings = _auto_accept_warnings(project, "prose")
+        warnings = _auto_accept_warnings(project, "prose")
 
-    if not _has_prose(text):
+        if not _has_prose(text):
+            record = {
+                "operation_id": op_id,
+                "operation_type": operation_type,
+                "chapter_id": chapter_id,
+                "revision": None,
+                "is_complete": False,
+                "status": chapter.status.value,
+                "stream_status": stream_status,
+                "reason": "no_prose_output",
+                "raw_output_ref": raw_ref,
+                "prompt_id": rendered.prompt_id,
+                "prompt_version": rendered.prompt_version,
+                "created_at": stamp,
+            }
+            _save_operation_record(project, chapter_id, record, operation_id=op_id)
+            emitter.invalid(
+                detail="Output rỗng hoặc chỉ là thông báo lỗi; không tạo prose revision.",
+                raw_ref=raw_ref,
+            )
+            return ActionResult(
+                operation_id=op_id,
+                chapter_id=chapter_id,
+                message=(
+                    "Writer không trả prose (output rỗng hoặc chỉ là thông báo lỗi); "
+                    "không mở Human Review/Finalize và không tạo prose revision."
+                ),
+                warnings=warnings
+                + [
+                    "Run được ghi `is_complete=False`; raw output đã lưu để người dùng xử lý."
+                ],
+                data=dict(record),
+            )
+
+        if continuation_of is not None and not _has_prose(text):
+            # Không thể xảy ra (đã kiểm tra ở trên) nhưng giữ nhánh tường minh.
+            raise GuardError("Không có prose nối tiếp để ghi.", code="no_prose_output")
+
+        is_complete = stream_status == "completed"
+        if continuation_of is None:
+            prose_text = text
+        else:
+            prose_text = _join_continuation(continuation_of, text)
+
+        revision = _next_revision(chapter)
+        markdown_ref = storage.write_markdown(
+            project,
+            _draft_relpath(chapter_id, revision),
+            prose_text,
+            operation_id=op_id,
+        )
+        draft = ProseRevision(
+            revision=revision,
+            markdown_ref=markdown_ref,
+            source_type=SourceType.llm,
+            is_complete=is_complete,
+            created_at=stamp,
+            dependency_pins=_dependency_pins(project, bundle, chapter_id),
+        )
+        updated = _apply_new_draft(chapter, draft, is_complete=is_complete)
+        storage.save_chapter(project, updated, operation_id=op_id)
+
         record = {
             "operation_id": op_id,
             "operation_type": operation_type,
             "chapter_id": chapter_id,
-            "revision": None,
-            "is_complete": False,
-            "status": chapter.status.value,
+            "revision": revision,
+            "is_complete": is_complete,
+            "status": updated.status.value,
             "stream_status": stream_status,
-            "reason": "no_prose_output",
+            "markdown_ref": markdown_ref,
             "raw_output_ref": raw_ref,
             "prompt_id": rendered.prompt_id,
             "prompt_version": rendered.prompt_version,
             "created_at": stamp,
         }
         _save_operation_record(project, chapter_id, record, operation_id=op_id)
-        return ActionResult(
-            operation_id=op_id,
-            chapter_id=chapter_id,
-            message=(
-                "Writer không trả prose (output rỗng hoặc chỉ là thông báo lỗi); "
-                "không mở Human Review/Finalize và không tạo prose revision."
-            ),
-            warnings=warnings
-            + [
-                "Run được ghi `is_complete=False`; raw output đã lưu để người dùng xử lý."
-            ],
-            data=dict(record),
-        )
-
-    if continuation_of is not None and not _has_prose(text):
-        # Không thể xảy ra (đã kiểm tra ở trên) nhưng giữ nhánh tường minh.
-        raise GuardError("Không có prose nối tiếp để ghi.", code="no_prose_output")
-
-    is_complete = stream_status == "completed"
-    if continuation_of is None:
-        prose_text = text
-    else:
-        prose_text = _join_continuation(continuation_of, text)
-
-    revision = _next_revision(chapter)
-    markdown_ref = storage.write_markdown(
-        project,
-        _draft_relpath(chapter_id, revision),
-        prose_text,
-        operation_id=op_id,
-    )
-    draft = ProseRevision(
-        revision=revision,
-        markdown_ref=markdown_ref,
-        source_type=SourceType.llm,
-        is_complete=is_complete,
-        created_at=stamp,
-        dependency_pins=_dependency_pins(project, bundle, chapter_id),
-    )
-    updated = _apply_new_draft(chapter, draft, is_complete=is_complete)
-    storage.save_chapter(project, updated, operation_id=op_id)
-
-    record = {
-        "operation_id": op_id,
-        "operation_type": operation_type,
-        "chapter_id": chapter_id,
-        "revision": revision,
-        "is_complete": is_complete,
-        "status": updated.status.value,
-        "stream_status": stream_status,
-        "markdown_ref": markdown_ref,
-        "raw_output_ref": raw_ref,
-        "prompt_id": rendered.prompt_id,
-        "prompt_version": rendered.prompt_version,
-        "created_at": stamp,
-    }
-    _save_operation_record(project, chapter_id, record, operation_id=op_id)
+    except Exception:
+        # Lỗi ghi/parse bất ngờ trong bước validate/persist: chưa có terminal event
+        # nào thì báo `error` để UI không treo ở `validating`; state cũ giữ nguyên.
+        if emitter.current not in TERMINAL_STATES:
+            emitter.fail(detail="Lỗi khi lưu kết quả generation; state cũ giữ nguyên.")
+        raise
 
     if is_complete:
         message = (
             f"Writer draft r{revision} complete cho `{chapter_id}`; chapter chuyển "
             "`review_required`."
+        )
+        emitter.saved(
+            detail=f"Draft r{revision} đã validate và ghi bền (chapter `review_required`).",
+            raw_ref=raw_ref,
         )
     else:
         message = (
@@ -557,6 +611,13 @@ def _run_generation(
         warnings = warnings + [
             "Stream đứt/chưa hoàn tất: draft được giữ partial, có thể Continue sau."
         ]
+        emitter.partial(
+            detail=(
+                f"Draft r{revision} chỉ là partial (`{stream_status}`): không mở "
+                "Review/Finalize, không auto accept."
+            ),
+            raw_ref=raw_ref,
+        )
 
     return ActionResult(
         operation_id=op_id,
@@ -575,6 +636,8 @@ def generate_draft(
     user_instruction: str = "",
     stream: bool = False,
     on_chunk: Callable[[StreamChunk], None] | None = None,
+    on_event: EventSink | None = None,
+    attempt: int = 1,
     operation_id: str | None = None,
     now: str | None = None,
 ) -> ActionResult:
@@ -582,7 +645,9 @@ def generate_draft(
 
     Guard (Skeleton accepted/fresh, previous chapter `final_reconciled`, context
     actual, không leak secret) chạy **trước** khi gọi LLM. `stream=True` phát
-    từng delta qua `on_chunk`; stream đứt giữ partial draft.
+    từng delta qua `on_chunk`; stream đứt giữ partial draft. `on_event` nhận
+    `GenerationEvent` theo contract T33 (`schemas.md` mục 11.1) — `on_chunk` giữ
+    lại cho caller cũ.
     """
     return _run_generation(
         project,
@@ -592,6 +657,8 @@ def generate_draft(
         user_instruction=user_instruction,
         stream=stream,
         on_chunk=on_chunk,
+        on_event=on_event,
+        attempt=attempt,
         operation_id=operation_id,
         now=now,
     )
@@ -606,10 +673,19 @@ def regenerate_draft(
 ) -> ActionResult:
     """Regenerate: prose revision mới, accepted/plan/final giữ nguyên.
 
-    `kwargs` nhận `user_instruction`, `stream`, `on_chunk`, `operation_id`,
-    `now`. Lỗi LLM hoặc guard fail **không** đổi draft cũ, final hay accepted.
+    `kwargs` nhận `user_instruction`, `stream`, `on_chunk`, `on_event`, `attempt`,
+    `operation_id`, `now`. Lỗi LLM hoặc guard fail **không** đổi draft cũ, final
+    hay accepted.
     """
-    allowed = {"user_instruction", "stream", "on_chunk", "operation_id", "now"}
+    allowed = {
+        "user_instruction",
+        "stream",
+        "on_chunk",
+        "on_event",
+        "attempt",
+        "operation_id",
+        "now",
+    }
     unknown = sorted(set(kwargs) - allowed)
     if unknown:
         raise ServiceError(
@@ -624,6 +700,8 @@ def regenerate_draft(
         user_instruction=str(kwargs.get("user_instruction") or ""),
         stream=bool(kwargs.get("stream")),
         on_chunk=kwargs.get("on_chunk"),
+        on_event=kwargs.get("on_event"),
+        attempt=int(kwargs.get("attempt") or 1),
         operation_id=kwargs.get("operation_id"),
         now=kwargs.get("now"),
     )
@@ -636,6 +714,8 @@ def continue_draft(
     chapter_id: str,
     stream: bool = False,
     on_chunk: Callable[[StreamChunk], None] | None = None,
+    on_event: EventSink | None = None,
+    attempt: int = 1,
     operation_id: str | None = None,
     now: str | None = None,
 ) -> ActionResult:
@@ -646,9 +726,19 @@ def continue_draft(
     stamp = now or now_iso()
     op_id = operation_id or generate_operation_id()
     chapter = _require_editable_chapter(project, chapter_id)
+    emitter = GenerationEmitter(
+        operation_id=op_id,
+        action=OPERATION_CONTINUE,
+        sink=on_event,
+        attempt=attempt,
+        prompt_id=DRAFT_PROMPT_ID,
+        artifact_id=f"draft_{chapter_id}",
+        chapter_id=chapter_id,
+    )
 
     existing = _load_operation_record(project, chapter_id, op_id)
     if existing is not None:
+        emitter.replay(detail="Operation đã hoàn tất trước đó; replay theo operation_id.")
         return _replay_result(existing, action=OPERATION_CONTINUE)
 
     current = chapter.current_draft
@@ -674,6 +764,8 @@ def continue_draft(
         user_instruction=instruction,
         stream=stream,
         on_chunk=on_chunk,
+        on_event=on_event,
+        attempt=attempt,
         operation_id=op_id,
         now=stamp,
         continuation_of=previous_text,

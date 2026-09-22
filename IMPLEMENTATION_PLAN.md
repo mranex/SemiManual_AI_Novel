@@ -2,6 +2,8 @@
 
 Ngày lập: 2026-09-19. Baseline sản phẩm: [Specification v0.2](novel_ai_spec_v0.2.md).
 
+**Ghi chú 2026-09-22:** Đây là kế hoạch MVP lịch sử T01–T25, hiện registry ghi đã done. Đợt sửa prototype sau user test nằm ở [FIX_IMPLEMENTATION_PLAN.md](FIX_IMPLEMENTATION_PLAN.md), task T26–T40 trong [registry](docs/tasks/README.md#registry-fix). Các mô tả “chưa có app” bên dưới phản ánh thời điểm lập kế hoạch, không phải hiện trạng.
+
 ## 1. Mục tiêu và hiện trạng
 
 Xây một ứng dụng local cho người dùng điều khiển toàn bộ quá trình viết tiểu thuyết bằng AI, từ ý tưởng đến chương được duyệt và đồng bộ state. Ưu tiên workflow đúng, state đáng tin cậy, dữ liệu đọc được và dễ debug.

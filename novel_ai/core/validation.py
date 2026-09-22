@@ -863,14 +863,36 @@ def _validate_foreshadows(payload: Any, context: ValidationContext, collector: I
     )
 
 
-def _validate_long_plan(payload: Any, context: ValidationContext, collector: IssueCollector) -> None:
-    index = context.index
-    volume_ids: list[str] = []
-    arc_ids: list[str] = []
-    for volume_position, volume in enumerate(payload.volumes):
-        volume_ids.append(volume.volume_id)
-        for arc_position, arc in enumerate(volume.arcs):
-            arc_ids.append(arc.arc_id)
+def long_plan_horizon_issues(
+    payload: Any, scope: Mapping[str, int] | None = None
+) -> list[ValidationIssue]:
+    """Invariant cấu trúc của Long Plan theo horizon (D017, `schemas.md` mục 3.1).
+
+    Phần không phụ thuộc scope (`empty_long_plan`, `empty_volume`,
+    `invalid_chapter_range`) luôn được kiểm. Khi `scope` được truyền, hàm kiểm
+    tiếp coverage: arc nằm trong horizon, arc đầu bắt đầu đúng `scope.start`, arc
+    cuối kết đúng `scope.end`, và các arc liên tục theo thứ tự volume → arc.
+
+    Đây là invariant **cấu trúc**: nó không đánh giá chất lượng phân rã, không có
+    quota số volume/arc và không thay semantic review của người dùng.
+    """
+    collector = IssueCollector()
+    volumes = getattr(payload, "volumes", None) or []
+    if not volumes:
+        collector.add("/payload/volumes", "empty_long_plan", "Long Plan phải có ít nhất một volume.")
+        return collector.issues
+
+    arcs: list[Any] = []
+    for volume_position, volume in enumerate(volumes):
+        volume_arcs = getattr(volume, "arcs", None) or []
+        if not volume_arcs:
+            collector.add(
+                json_pointer("payload", "volumes", volume_position, "arcs"),
+                "empty_volume",
+                f"Volume `{volume.volume_id}` phải có ít nhất một arc.",
+            )
+            continue
+        for arc_position, arc in enumerate(volume_arcs):
             base = json_pointer("payload", "volumes", volume_position, "arcs", arc_position)
             if arc.chapter_range.end < arc.chapter_range.start:
                 collector.add(
@@ -878,6 +900,72 @@ def _validate_long_plan(payload: Any, context: ValidationContext, collector: Iss
                     "invalid_chapter_range",
                     "chapter_range của arc phải có start <= end.",
                 )
+            arcs.append(arc)
+
+    if collector.issues or scope is None or not arcs:
+        return collector.issues
+
+    start = int(scope["start"])
+    end = int(scope["end"])
+    for arc in arcs:
+        low = arc.chapter_range.start
+        high = arc.chapter_range.end
+        if low < start or high > end:
+            collector.add(
+                "/payload/volumes",
+                "out_of_scope_arc",
+                f"Arc `{arc.arc_id}` có chapter_range {low}-{high} nằm ngoài "
+                f"planning_scope {start}-{end}.",
+            )
+    if collector.issues:
+        return collector.issues
+
+    if arcs[0].chapter_range.start != start:
+        collector.add(
+            "/payload/volumes",
+            "uncovered_scope_start",
+            f"Arc đầu tiên bắt đầu ở chương {arcs[0].chapter_range.start} nhưng "
+            f"planning_scope bắt đầu ở {start}.",
+        )
+    if arcs[-1].chapter_range.end != end:
+        collector.add(
+            "/payload/volumes",
+            "uncovered_scope_end",
+            f"Arc cuối kết ở chương {arcs[-1].chapter_range.end} nhưng planning_scope "
+            f"kết ở {end}.",
+        )
+    for previous, current in zip(arcs, arcs[1:]):
+        previous_end = previous.chapter_range.end
+        current_start = current.chapter_range.start
+        if current_start == previous_end + 1:
+            continue
+        if current_start <= previous_end:
+            collector.add(
+                "/payload/volumes",
+                "overlap",
+                f"Arc `{current.arc_id}` ({current_start}-{current.chapter_range.end}) "
+                f"chồng lấn arc `{previous.arc_id}` (kết {previous_end}).",
+            )
+        else:
+            collector.add(
+                "/payload/volumes",
+                "gap_in_scope",
+                f"Thiếu coverage chương {previous_end + 1}-{current_start - 1} giữa arc "
+                f"`{previous.arc_id}` và `{current.arc_id}`.",
+            )
+    return collector.issues
+
+
+def _validate_long_plan(payload: Any, context: ValidationContext, collector: IssueCollector) -> None:
+    index = context.index
+    collector.issues.extend(long_plan_horizon_issues(payload))
+    volume_ids: list[str] = []
+    arc_ids: list[str] = []
+    for volume_position, volume in enumerate(payload.volumes):
+        volume_ids.append(volume.volume_id)
+        for arc_position, arc in enumerate(volume.arcs):
+            arc_ids.append(arc.arc_id)
+            base = json_pointer("payload", "volumes", volume_position, "arcs", arc_position)
             for position, character_id in enumerate(arc.character_ids):
                 check_reference(
                     character_id,

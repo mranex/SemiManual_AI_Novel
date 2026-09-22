@@ -28,7 +28,7 @@ from typing import Any
 
 from novel_ai.core.models import ArtifactStatus
 from novel_ai.services import GuardError, ServiceError, architect
-from novel_ai.ui import page_header, set_action_result, show_action_result
+from novel_ai.ui import editor, generation, page_header, set_action_result, show_action_result
 from novel_ai.ui.layout import AppContext
 
 from . import _chapter_ui, _common
@@ -235,7 +235,15 @@ def render(ctx: AppContext) -> None:
             "vẫn dùng được."
         )
     _render_state_panel(ctx, artifact_type)
-    _render_generate_form(ctx, artifact_type)
+    scoped = generation.scope_key(
+        project_id=project.config.project_id,
+        workspace="architect",
+        artifact_id=artifact_type,
+    )
+    surface = generation.start_surface(
+        scoped, transcript=generation.load_transcript(scoped), project=project
+    )
+    _render_generate_form(ctx, artifact_type, surface=surface)
     _render_candidate_panel(ctx, artifact_type)
     if artifact_type in APPEND_TYPES:
         _render_append_panel(ctx, artifact_type)
@@ -288,7 +296,9 @@ def _render_state_panel(ctx: AppContext, artifact_type: str) -> None:
             st.json(envelope.accepted_revision.payload.model_dump(mode="json"))
 
 
-def _render_generate_form(ctx: AppContext, artifact_type: str) -> None:
+def _render_generate_form(
+    ctx: AppContext, artifact_type: str, *, surface: generation.GenerationSurface
+) -> None:
     import streamlit as st
 
     project = ctx.project
@@ -328,6 +338,14 @@ def _render_generate_form(ctx: AppContext, artifact_type: str) -> None:
             value=1,
             step=1,
             key=f"novel_ai_architect_attempt_{artifact_type}",
+        )
+        can_stream = _chapter_ui.stream_supported(ctx.llm_client)
+        stream = st.checkbox(
+            "Stream (hiện raw JSON theo từng delta)",
+            value=bool(can_stream),
+            key=f"novel_ai_architect_stream_{artifact_type}",
+            disabled=not can_stream,
+            help="Structured JSON chỉ được parse/validate sau khi stream hoàn tất.",
         )
         submitted = st.form_submit_button("Chạy generate/regenerate/edit")
 
@@ -395,13 +413,33 @@ def _render_generate_form(ctx: AppContext, artifact_type: str) -> None:
         int(attempt),
         ",".join(assigned_ids or []),
     )
+    scoped = generation.scope_key(
+        project_id=project.config.project_id,
+        workspace="architect",
+        artifact_id=artifact_type,
+    )
+    transcript, on_event = generation.recorder_for(
+        surface,
+        action=f"architect.{artifact_type}.{action}",
+        operation_id=operation_id,
+        stream=bool(stream),
+        attempt=int(attempt),
+        artifact_id=artifact_type,
+        project=project,
+    )
     try:
         blocked, result = _chapter_ui.run_action(
             f"novel_ai_architect_generate_{artifact_type}",
             intent=("generate", artifact_type, operation_id),
             project=project,
             call=lambda: architect.generate(
-                project, client=ctx.llm_client, operation_id=operation_id, **params
+                project,
+                client=ctx.llm_client,
+                operation_id=operation_id,
+                on_event=on_event,
+                stream=bool(stream),
+                attempt=int(attempt),
+                **params,
             ),
         )
     except ServiceError as error:
@@ -414,7 +452,9 @@ def _render_generate_form(ctx: AppContext, artifact_type: str) -> None:
         )
         return
     if blocked:
+        surface.render(transcript, project=project)
         return
+    surface.render(transcript, project=project)
     set_action_result(result)
     st.rerun()
 
@@ -423,6 +463,12 @@ def _append_template(artifact_type: str) -> str:
     """Khung JSON rỗng cho entry append mới (chỉ collection, không kèm entry cũ)."""
     collection = _ENTITY_FIELDS[artifact_type][0]
     return json.dumps({collection: []}, ensure_ascii=False, indent=2)
+
+
+def _reload_editor_widgets(artifact_type: str) -> None:
+    """Quên hết giá trị form/raw editor của artifact để nạp lại từ candidate."""
+    prefix = _common.editor_key(artifact_type, workspace="architect")
+    _common.clear_session_keys_with_prefix(prefix)
 
 
 def _candidate_editor(artifact_type: str, payload: Any, *, version: Any) -> str:
@@ -435,10 +481,9 @@ def _candidate_editor(artifact_type: str, payload: Any, *, version: Any) -> str:
     import streamlit as st
 
     key = _common.editor_key(artifact_type, workspace="architect")
-    text = _common.sync_text_editor(key, _payload_text(payload), version=version)
+    _common.sync_text_editor(key, _payload_text(payload), version=version)
     return st.text_area(
         "Sửa candidate (JSON, validate theo field)",
-        value=text,
         height=260,
         key=key,
     )
@@ -451,8 +496,25 @@ def _render_candidate_panel(ctx: AppContext, artifact_type: str) -> None:
     assert project is not None
     envelope = _common.envelope_or_none(project, artifact_type)
     st.subheader("Candidate vs accepted")
-    if envelope is None or envelope.candidate_revision is None:
-        st.caption("Chưa có candidate nào đang chờ accept.")
+    if envelope is None:
+        st.caption("Artifact này chưa có revision nào trong project.")
+        return
+    if envelope.candidate_revision is None:
+        accepted_only = envelope.accepted_revision
+        if accepted_only is not None and accepted_only.accepted_by == "auto_accept":
+            # T37: output AI đã auto accept là **accepted state**, không phải candidate
+            # chờ Accept. View nói đúng và chỉ cho action revise tường minh.
+            st.success(
+                "Artifact này đã được **auto accept** (structured output đã validate). "
+                "Đây là accepted revision, không phải candidate đang chờ Accept."
+            )
+            st.caption(
+                "Muốn sửa: dùng workspace **Revision** (revise tường minh) hoặc chạy "
+                "Generate/Regenerate để tạo candidate mới rồi Accept."
+            )
+            st.json(accepted_only.payload.model_dump(mode="json"))
+        else:
+            st.caption("Chưa có candidate nào đang chờ accept.")
         return
     candidate = envelope.candidate_revision
     accepted = envelope.accepted_revision
@@ -484,15 +546,35 @@ def _render_candidate_panel(ctx: AppContext, artifact_type: str) -> None:
         "Nạp lại editor từ candidate", key=f"novel_ai_architect_reload_{artifact_type}"
     ):
         _common.clear_session_keys(key, f"{key}__source")
+        _reload_editor_widgets(artifact_type)
         st.rerun()
-    edited = _candidate_editor(artifact_type, candidate.payload, version=version)
 
-    save_col, accept_col, reject_col = st.columns(3)
-    with save_col:
-        save_clicked = st.button(
-            "Lưu candidate đã sửa",
+    form_tab, raw_tab = st.tabs(["Form theo schema", "Raw JSON (nâng cao)"])
+    with form_tab:
+        st.caption(
+            "Field hiển thị theo schema thật của artifact. Stable ID/status/revision là "
+            "read-only; field `⚠ author-only` không được gửi Writer."
+        )
+        payload_dict = candidate.payload.model_dump(mode="json")
+        edited_payload = editor.render_artifact_form(
+            artifact_type, payload_dict, key_prefix=f"{key}__form"
+        )
+        form_save = st.button(
+            "Lưu candidate (form)",
+            key=f"novel_ai_architect_edit_form_{artifact_type}",
+        )
+        if candidate.validation.errors:
+            for path, messages in editor.field_issues(candidate.validation).items():
+                label = f"`{path}`" if path else "(payload)"
+                st.warning(f"{label}: " + " · ".join(messages))
+    with raw_tab:
+        edited = _candidate_editor(artifact_type, candidate.payload, version=version)
+        raw_save = st.button(
+            "Lưu candidate (raw JSON)",
             key=f"novel_ai_architect_edit_{artifact_type}",
         )
+
+    accept_col, reject_col = st.columns(2)
     with accept_col:
         accept_clicked = st.button(
             "Accept candidate", key=f"novel_ai_architect_accept_{artifact_type}"
@@ -502,7 +584,23 @@ def _render_candidate_panel(ctx: AppContext, artifact_type: str) -> None:
             "Reject candidate", key=f"novel_ai_architect_reject_{artifact_type}"
         )
 
-    if save_clicked:
+    if form_save:
+        try:
+            result = architect.edit_candidate(
+                project, artifact_type=artifact_type, payload=edited_payload
+            )
+        except ServiceError as error:
+            _common.render_service_error(
+                error,
+                next_step=(
+                    "Sửa đúng field được nêu ở trên rồi lưu lại; nội dung bạn nhập vẫn còn "
+                    "và accepted revision giữ nguyên."
+                ),
+            )
+        else:
+            set_action_result(result)
+            st.rerun()
+    if raw_save:
         payload, parse_error = _common.parse_json_payload(edited)
         if parse_error:
             st.error(f"Chưa lưu được candidate: {parse_error}")
@@ -594,10 +692,9 @@ def _render_append_panel(ctx: AppContext, artifact_type: str) -> None:
         _common.clear_session_keys(key, f"{key}__source")
         st.rerun()
     baseline = _append_template(artifact_type)
-    text = _common.sync_text_editor(key, baseline, version=version)
+    _common.sync_text_editor(key, baseline, version=version)
     edited = st.text_area(
         "Entry mới cần append (JSON, cùng shape payload accepted)",
-        value=text,
         height=240,
         key=key,
     )

@@ -1,10 +1,15 @@
-"""Short Plan và Rolling Plan service (T14).
+"""Short Plan và Rolling Plan service (T14, guard contract viết T31).
 
-Hiện thực action theo `docs/design/workflow.md` mục 4.2 và
+Hiện thực action theo `docs/design/workflow.md` mục 4.2, 5.6 và
 `docs/design/schemas.md` mục 3.2, 6.5:
 
 - `generate`: Short Plan candidate chỉ trong arc được chọn; chapter ID do backend
-  cấp qua `assign_chapter_ids`; guard Long Plan accepted/fresh trước khi gọi LLM.
+  cấp qua `assign_chapter_ids`; guard Long Plan accepted/fresh **và** contract viết
+  `{language, pov, length_guidance}` của mọi assigned chapter **trước** khi gọi LLM
+  (D016). Giá trị hiệu lực = override của chương (nếu nhập) ngược lại default của
+  project (`project.config.default_pov`/`default_length_guidance`/
+  `default_language`). Thiếu/sai ⇒ `GuardError` với chapter/field cụ thể,
+  `client.calls == []`, không tạo raw record.
   `assigned_chapters=None` được suy theo quy tắc trong `resolve_assigned_chapters`:
   - `edit`/`regenerate` khi đã có Short Plan: dùng lại đúng các chapter đang có
     trong plan (trong range của arc) để LLM viết lại;
@@ -37,6 +42,7 @@ from pydantic import ValidationError
 
 from novel_ai.core import context as context_core
 from novel_ai.core import lifecycle, storage, validation
+from novel_ai.core.generation import EventSink, GenerationEmitter
 from novel_ai.core.models import (
     ARTIFACT_PAYLOAD_MODELS,
     ArcPlan,
@@ -59,12 +65,14 @@ from novel_ai.core.models import (
     reserve_id_pool,
 )
 from novel_ai.core.project import Project
-from novel_ai.services import ActionResult, GuardError
+from novel_ai.services import ActionResult, GuardError, ValidationFailure
 from novel_ai.services.co_create import (
     artifact_write_committed,
+    current_dependency_pins,
     check_pin_freshness,
     complete_json,
     foundation_reference_index,
+    generation_stage,
     parse_structured_or_fail,
     payload_source,
     require_accepted_artifact,
@@ -73,20 +81,28 @@ from novel_ai.services.co_create import (
 )
 
 __all__ = [
+    "CONSTRAINT_FIELDS",
     "accept",
+    "edit_candidate",
     "accept_rolling",
     "assign_chapter_ids",
+    "effective_chapter_constraints",
     "eligible_chapters_for_rolling",
     "generate",
     "generate_rolling",
+    "project_writing_defaults",
     "reject",
     "reject_rolling",
     "resolve_assigned_chapters",
+    "resolve_constraint_issues",
 ]
 
 SHORT_PLAN_ARTIFACT_ID = "short_plan"
 SHORT_PLAN_PROMPT_ID = "short_plan.v1"
 ROLLING_PROMPT_ID = "rolling_plan.v1"
+
+#: Contract viết bắt buộc cho mỗi assigned chapter (D013/D016).
+CONSTRAINT_FIELDS: tuple[str, ...] = ("language", "pov", "length_guidance")
 
 #: Số chương đưa vào reviewed range mặc định của Rolling review.
 ROLLING_REVIEW_WINDOW = 3
@@ -347,6 +363,141 @@ def _candidate_scope_issues(
         validation.validate_plan_does_not_mutate_state(payload.model_dump(mode="json")).errors
     )
     return collector.issues
+
+
+def project_writing_defaults(project: Project) -> dict[str, str]:
+    """Default viết theo project (D016); rỗng nghĩa là **chưa thiết lập**.
+
+    App không bịa POV/số từ: giá trị rỗng được giữ nguyên để guard báo thiếu thay
+    vì âm thầm dùng một mặc định không do user chọn.
+    """
+    return {
+        "language": str(project.config.default_language or "").strip(),
+        "pov": str(project.config.default_pov or "").strip(),
+        "length_guidance": str(project.config.default_length_guidance or "").strip(),
+    }
+
+
+def effective_chapter_constraints(
+    project: Project,
+    assigned_chapters: Sequence[Mapping[str, Any]],
+    chapter_constraints: Sequence[Mapping[str, Any]] = (),
+) -> list[dict[str, str]]:
+    """Giá trị hiệu lực `{chapter_id, language, pov, length_guidance}` từng chapter.
+
+    Thứ tự trả theo `assigned_chapters`. Override của chương thắng default project;
+    override rỗng (chuỗi trắng) coi như **không nhập** và rơi về default. Hàm này
+    không raise: caller (service/UI) tự quyết định cách báo lỗi.
+    """
+    defaults = project_writing_defaults(project)
+    override_map: dict[str, dict[str, str]] = {}
+    for item in chapter_constraints:
+        chapter_id = str(item.get("chapter_id", "")).strip()
+        if not chapter_id:
+            continue
+        override_map.setdefault(chapter_id, {})
+        for field in CONSTRAINT_FIELDS:
+            raw = str(item.get(field, "") or "").strip()
+            if raw:
+                override_map[chapter_id][field] = raw
+    effective: list[dict[str, str]] = []
+    for item in assigned_chapters:
+        chapter_id = str(item["chapter_id"])
+        override = override_map.get(chapter_id, {})
+        row = {"chapter_id": chapter_id}
+        for field in CONSTRAINT_FIELDS:
+            row[field] = override.get(field) or defaults.get(field, "")
+        effective.append(row)
+    return effective
+
+
+def resolve_constraint_issues(
+    project: Project,
+    assigned_chapters: Sequence[Mapping[str, Any]],
+    chapter_constraints: Sequence[Mapping[str, Any]] = (),
+) -> list[dict[str, str]]:
+    """Issue cấu trúc của `chapter_constraints` **trước** khi gọi LLM (D016).
+
+    Trả list dict `{code, chapter_id, field, message}`:
+
+    - `duplicate_chapter_constraint`: cùng `chapter_id` xuất hiện nhiều lần;
+    - `unknown_chapter_constraint`: `chapter_id` không nằm trong assigned scope;
+    - `missing_writing_contract`: field không rỗng sau khi resolve default project
+      + override chương.
+    """
+    assigned_ids = [str(item["chapter_id"]) for item in assigned_chapters]
+    assigned_set = set(assigned_ids)
+    issues: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in chapter_constraints:
+        chapter_id = str(item.get("chapter_id", "")).strip()
+        if not chapter_id:
+            issues.append(
+                {
+                    "code": "unknown_chapter_constraint",
+                    "chapter_id": "",
+                    "field": "chapter_id",
+                    "message": "`chapter_constraints` thiếu `chapter_id`.",
+                }
+            )
+            continue
+        if chapter_id in seen:
+            issues.append(
+                {
+                    "code": "duplicate_chapter_constraint",
+                    "chapter_id": chapter_id,
+                    "field": "chapter_id",
+                    "message": f"`{chapter_id}` có nhiều hơn một entry `chapter_constraints`.",
+                }
+            )
+        seen.add(chapter_id)
+        if chapter_id not in assigned_set:
+            issues.append(
+                {
+                    "code": "unknown_chapter_constraint",
+                    "chapter_id": chapter_id,
+                    "field": "chapter_id",
+                    "message": (
+                        f"`{chapter_id}` không nằm trong assigned_chapters "
+                        f"{assigned_ids}."
+                    ),
+                }
+            )
+    effective = effective_chapter_constraints(project, assigned_chapters, chapter_constraints)
+    for row in effective:
+        missing = [field for field in CONSTRAINT_FIELDS if not row[field]]
+        for field in missing:
+            issues.append(
+                {
+                    "code": "missing_writing_contract",
+                    "chapter_id": row["chapter_id"],
+                    "field": field,
+                    "message": (
+                        f"Chapter `{row['chapter_id']}` thiếu `{field}`: nhập override cho "
+                        "chương hoặc lưu default viết cho project trước khi generate."
+                    ),
+                }
+            )
+    return issues
+
+
+def require_writing_contract(
+    project: Project,
+    assigned_chapters: Sequence[Mapping[str, Any]],
+    chapter_constraints: Sequence[Mapping[str, Any]] = (),
+) -> list[dict[str, str]]:
+    """Guard trước LLM: raise `GuardError` nếu contract viết chưa đủ (D016)."""
+    issues = resolve_constraint_issues(project, assigned_chapters, chapter_constraints)
+    if not issues:
+        return effective_chapter_constraints(
+            project, assigned_chapters, chapter_constraints
+        )
+    codes = {issue["code"] for issue in issues}
+    raise GuardError(
+        "Chưa đủ yêu cầu viết cho mọi assigned chapter; backend chặn trước khi gọi LLM.",
+        code="missing_writing_contract" if "missing_writing_contract" in codes else sorted(codes)[0],
+        details={"issues": issues},
+    )
 
 
 def _accept_scope_issues(
@@ -652,18 +803,34 @@ def generate(
     user_instruction: str = "",
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Generate/regenerate/edit Short Plan candidate cho **một** arc.
 
-    Guard: Base Idea accepted, Long Plan accepted/fresh, arc tồn tại, và có
-    chapter được giao. Candidate provisional (chưa đủ actual) **không** được
-    auto-accept theo D014.
+    Guard: Base Idea accepted, Long Plan accepted/fresh, arc tồn tại, contract viết
+    đủ cho mọi assigned chapter (D016), và có chapter được giao. Candidate
+    provisional (chưa đủ actual) **không** được auto-accept theo D014. `on_event`
+    nhận `GenerationEvent` (T33/D019).
     """
     if action not in _SHORT_PLAN_ACTIONS:
         raise GuardError(
             f"Action Short Plan chỉ nhận {sorted(_SHORT_PLAN_ACTIONS)}.", code="invalid_action"
         )
     op_id = operation_id or generate_operation_id()
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action=f"short_plan.{action}",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=SHORT_PLAN_PROMPT_ID,
+            artifact_id=SHORT_PLAN_ARTIFACT_ID,
+        )
+        if on_event is not None
+        else None
+    )
     require_base_idea(project)
     long_plan = _accepted_long_plan(project)
     arc = _find_arc(long_plan, arc_id)
@@ -698,12 +865,16 @@ def generate(
             details={"chapter_ids": sorted(locked)},
         )
 
+    # Guard contract viết **trước** context/LLM (D016): thiếu language/pov/
+    # length_guidance ở bất kỳ assigned chapter nào ⇒ zero LLM call, không raw record.
+    effective_constraints = require_writing_contract(project, assigned, chapter_constraints)
+
     try:
         bundle = context_core.build_short_plan_context(
             project,
             arc_id=arc_id,
             assigned_chapters=assigned,
-            chapter_constraints=chapter_constraints,
+            chapter_constraints=effective_constraints,
             action=action,
             user_instruction=user_instruction,
         )
@@ -718,28 +889,31 @@ def generate(
         operation_id=op_id,
         now=now,
         label="short_plan",
+        emitter=emitter,
+        stream=stream,
     )
-    parsed = parse_structured_or_fail(
-        project,
-        call=call,
-        model_cls=ARTIFACT_PAYLOAD_MODELS["short_plan"],
-        operation_id=op_id,
-        now=now,
-        label="short_plan",
-        artifact_id=SHORT_PLAN_ARTIFACT_ID,
-    )
-    result = validate_or_fail(
-        project,
-        artifact_type="short_plan",
-        payload=parsed,
-        context=validation.ValidationContext(index=foundation_reference_index(project)),
-        operation_id=op_id,
-        now=now,
-        label="short_plan",
-        raw_output_ref=call.raw_ref,
-        artifact_id=SHORT_PLAN_ARTIFACT_ID,
-        extra_issues=_candidate_scope_issues(parsed, arc=arc, assigned=assigned),
-    )
+    with generation_stage(emitter, detail="Đang parse/validate Short Plan."):
+        parsed = parse_structured_or_fail(
+            project,
+            call=call,
+            model_cls=ARTIFACT_PAYLOAD_MODELS["short_plan"],
+            operation_id=op_id,
+            now=now,
+            label="short_plan",
+            artifact_id=SHORT_PLAN_ARTIFACT_ID,
+        )
+        result = validate_or_fail(
+            project,
+            artifact_type="short_plan",
+            payload=parsed,
+            context=validation.ValidationContext(index=foundation_reference_index(project)),
+            operation_id=op_id,
+            now=now,
+            label="short_plan",
+            raw_output_ref=call.raw_ref,
+            artifact_id=SHORT_PLAN_ARTIFACT_ID,
+            extra_issues=_candidate_scope_issues(parsed, arc=arc, assigned=assigned),
+        )
 
     envelope = _envelope_or_new(project, SHORT_PLAN_ARTIFACT_ID, "short_plan", now=now)
     provisional = bundle.mode is ContextMode.provisional
@@ -815,6 +989,15 @@ def generate(
         if envelope.accepted_revision is not None
         else (envelope.candidate_revision.revision if envelope.candidate_revision else None)
     )
+    if emitter is not None:
+        emitter.saved(
+            detail=(
+                f"Auto Accept đã accept Short Plan r{revision} sau full validation."
+                if auto_accepted
+                else f"Short Plan candidate r{revision} đã validate và lưu (chưa accept)."
+            ),
+            raw_ref=call.raw_ref,
+        )
     return ActionResult(
         operation_id=op_id,
         artifact_id=SHORT_PLAN_ARTIFACT_ID,
@@ -829,6 +1012,7 @@ def generate(
             "revision": revision,
             "arc_id": arc_id,
             "assigned_chapters": assigned,
+            "writing_contract": effective_constraints,
             "context_mode": bundle.mode.value,
             "auto_accepted": auto_accepted,
             "raw_output_ref": call.raw_ref,
@@ -921,6 +1105,166 @@ def _guard_provisional_candidate(project: Project, candidate: Any) -> None:
                 "chapters_with_prose": outdated,
             },
         )
+
+
+def edit_candidate(
+    project: Project,
+    *,
+    arc_id: str,
+    payload: Mapping[str, Any] | ShortPlanPayload,
+    expected_revision: int | None = None,
+    operation_id: str | None = None,
+    now: str | None = None,
+) -> ActionResult:
+    """Lưu bản Short Plan do **người dùng sửa** thành candidate mới (T36).
+
+    Không gọi LLM và **không** auto accept dù `auto_accept_structured` bật. Payload
+    người dùng chỉ chứa nội dung; `status`/`revision`/pin do app sở hữu.
+
+    Guard: schema, arc khớp, chapter nằm trong arc và có metadata, chapter đã
+    `finalizing`/`final_reconciled` không được đổi plan, chapter ngoài scope được
+    giữ nguyên từ accepted (`_merge_with_accepted`), working copy cũ bị từ chối
+    (`expected_revision`). Lỗi giữ nguyên candidate/accepted cũ.
+    """
+    op_id = operation_id or generate_operation_id()
+    envelope = storage.load_artifact(project, SHORT_PLAN_ARTIFACT_ID)
+    if envelope is None or (
+        envelope.accepted_revision is None and envelope.candidate_revision is None
+    ):
+        raise GuardError(
+            "Chưa có Short Plan accepted/candidate để sửa; hãy generate trước.",
+            code="missing_artifact",
+            details={"artifact_id": SHORT_PLAN_ARTIFACT_ID},
+        )
+    base_revision_obj = envelope.candidate_revision or envelope.accepted_revision
+    assert base_revision_obj is not None
+    if expected_revision is not None and int(expected_revision) != int(base_revision_obj.revision):
+        raise GuardError(
+            f"Working copy đang dựa trên revision {expected_revision} nhưng Short Plan hiện tại "
+            f"là r{base_revision_obj.revision}; nạp lại rồi sửa tiếp.",
+            code="stale_working_copy",
+            details={
+                "expected_revision": int(expected_revision),
+                "current_revision": int(base_revision_obj.revision),
+            },
+        )
+
+    data = (
+        payload.model_dump(mode="json")
+        if isinstance(payload, ShortPlanPayload)
+        else dict(payload)
+    )
+    try:
+        parsed = ShortPlanPayload.model_validate(data)
+    except ValidationError as exc:
+        issues = validation.issues_from_pydantic_error(exc, base_path="/payload")
+        raise ValidationFailure(
+            "Short Plan do bạn sửa không đúng contract: "
+            f"{validation.summarize_errors(validation.result_from_issues(issues))}",
+            result=validation.result_from_issues(issues),
+            code="invalid_payload",
+            details={"artifact_id": SHORT_PLAN_ARTIFACT_ID},
+        ) from exc
+
+    if parsed.arc_id != arc_id:
+        raise ValidationFailure(
+            f"Payload khai arc `{parsed.arc_id}` nhưng action là `{arc_id}`.",
+            code="arc_mismatch",
+            details={"arc_id": arc_id, "payload_arc_id": parsed.arc_id},
+        )
+    arc = _find_arc(_accepted_long_plan(project), arc_id)
+    if arc is None:
+        raise GuardError(
+            f"Arc `{arc_id}` không có trong Long Plan accepted.",
+            code="unknown_arc",
+            details={"arc_id": arc_id},
+        )
+
+    # Chapter ngoài scope (arc khác) được giữ nguyên từ accepted: bản sửa chỉ đụng
+    # chapter thuộc arc này.
+    merged = _merge_with_accepted(project, parsed)
+    locked = _locked_chapter_ids(project)
+    previous = (
+        base_revision_obj.payload
+        if isinstance(base_revision_obj.payload, ShortPlanPayload)
+        else ShortPlanPayload.model_validate(base_revision_obj.payload)
+    )
+    previous_by_id = {chapter.chapter_id: chapter for chapter in previous.chapters}
+    touched = {chapter.chapter_id for chapter in parsed.chapters}
+    touched_locked = sorted(touched & locked)
+    if touched_locked:
+        raise ValidationFailure(
+            "Không được sửa plan của chapter đã `finalizing`/`final_reconciled`: "
+            + ", ".join(touched_locked),
+            code="chapter_already_final",
+            details={"chapter_ids": touched_locked},
+        )
+    for chapter in parsed.chapters:
+        before = previous_by_id.get(chapter.chapter_id)
+        if before is not None and before.chapter_number != chapter.chapter_number:
+            raise ValidationFailure(
+                f"`{chapter.chapter_id}` đổi `chapter_number` từ {before.chapter_number} "
+                f"sang {chapter.chapter_number}; số chương do app sở hữu.",
+                code="chapter_number_mismatch",
+                details={"chapter_id": chapter.chapter_id},
+            )
+
+    assigned = [
+        {"chapter_id": chapter.chapter_id, "chapter_number": chapter.chapter_number}
+        for chapter in merged.chapters
+        if arc.chapter_range.start <= chapter.chapter_number <= arc.chapter_range.end
+    ]
+    result = validation.validate_artifact_payload(
+        "short_plan",
+        merged,
+        context=validation.ValidationContext(index=foundation_reference_index(project)),
+    )
+    extra_issues = _candidate_scope_issues(merged, arc=arc, assigned=assigned)
+    combined = validation.result_from_issues([*result.errors, *extra_issues])
+    if not combined.is_valid:
+        raise ValidationFailure(
+            "Short Plan sửa tay không qua validation: " + validation.summarize_errors(combined),
+            result=combined,
+            code="validation_failed",
+            details={"artifact_id": SHORT_PLAN_ARTIFACT_ID},
+        )
+
+    updated = lifecycle.set_candidate(
+        envelope,
+        merged,
+        source=PayloadSource(source_type=SourceType.user, operation_id=op_id),
+        dependency_pins=[
+            pin for pin in current_dependency_pins(project)
+        ],
+        validation=combined,
+        preparation_context=base_revision_obj.preparation_context,
+        now=now,
+    )
+    storage.save_artifact(project, updated, operation_id=op_id)
+    warnings: list[str] = []
+    if base_revision_obj.preparation_context is not None:
+        warnings.append(
+            "Candidate vẫn mang dấu chuẩn bị trước (provisional); phải review/regenerate trên "
+            "actual trước khi accept."
+        )
+    return ActionResult(
+        operation_id=op_id,
+        artifact_id=SHORT_PLAN_ARTIFACT_ID,
+        message="Đã lưu Short Plan candidate do bạn sửa (chưa accept; không gọi LLM).",
+        warnings=warnings,
+        data={
+            "status": updated.status.value,
+            "revision": updated.candidate_revision.revision
+            if updated.candidate_revision
+            else None,
+            "arc_id": arc_id,
+            "touched_chapters": sorted(touched),
+            "kept_chapters": sorted(
+                chapter.chapter_id for chapter in merged.chapters if chapter.chapter_id not in touched
+            ),
+        },
+        validation=combined,
+    )
 
 
 def accept(
@@ -1124,14 +1468,30 @@ def generate_rolling(
     user_instruction: str = "",
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Sinh proposal Rolling cho Short Plan hiện hành và lưu candidate draft.
 
     Proposal **không** được accept ở đây. Target ngoài eligible scope, reviewed
     range vượt actual, vi phạm `allow_relationship_replan` hoặc field ngoài
-    allowlist bị từ chối ngay bằng `ValidationFailure`.
+    allowlist bị từ chối ngay bằng `ValidationFailure`. `on_event` nhận
+    `GenerationEvent` (T33/D019).
     """
     op_id = operation_id or generate_operation_id()
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action="rolling_plan.generate",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=ROLLING_PROMPT_ID,
+            artifact_id=_rolling_artifact_id(arc_id) if arc_id else "rolling_patch",
+        )
+        if on_event is not None
+        else None
+    )
     plan_envelope = require_accepted_artifact(project, SHORT_PLAN_ARTIFACT_ID)
     plan_payload = plan_envelope.accepted_revision.payload if plan_envelope.accepted_revision else None
     assert plan_payload is not None
@@ -1181,40 +1541,43 @@ def generate_rolling(
         operation_id=op_id,
         now=now,
         label="rolling_patch",
+        emitter=emitter,
+        stream=stream,
     )
     artifact_id = _rolling_artifact_id(target_arc_id)
-    parsed = parse_structured_or_fail(
-        project,
-        call=call,
-        model_cls=ARTIFACT_PAYLOAD_MODELS["rolling_patch"],
-        operation_id=op_id,
-        now=now,
-        label="rolling_patch",
-        artifact_id=artifact_id,
-    )
-    result = validate_or_fail(
-        project,
-        artifact_type="rolling_patch",
-        payload=parsed,
-        context=validation.ValidationContext(
-            index=foundation_reference_index(project),
-            eligible_chapter_ids=frozenset(eligible_ids),
-            allow_relationship_replan=project.config.allow_relationship_replan,
-            reviewed_chapter_range=(reviewed["start"], reviewed["end"]),
-        ),
-        operation_id=op_id,
-        now=now,
-        label="rolling_patch",
-        raw_output_ref=call.raw_ref,
-        artifact_id=artifact_id,
-        extra_issues=_rolling_issues(
+    with generation_stage(emitter, detail="Đang parse/validate Rolling proposal."):
+        parsed = parse_structured_or_fail(
             project,
-            parsed,
-            plan_payload=plan_payload,
-            eligible_ids=eligible_ids,
-            latest_final=latest_final,
-        ),
-    )
+            call=call,
+            model_cls=ARTIFACT_PAYLOAD_MODELS["rolling_patch"],
+            operation_id=op_id,
+            now=now,
+            label="rolling_patch",
+            artifact_id=artifact_id,
+        )
+        result = validate_or_fail(
+            project,
+            artifact_type="rolling_patch",
+            payload=parsed,
+            context=validation.ValidationContext(
+                index=foundation_reference_index(project),
+                eligible_chapter_ids=frozenset(eligible_ids),
+                allow_relationship_replan=project.config.allow_relationship_replan,
+                reviewed_chapter_range=(reviewed["start"], reviewed["end"]),
+            ),
+            operation_id=op_id,
+            now=now,
+            label="rolling_patch",
+            raw_output_ref=call.raw_ref,
+            artifact_id=artifact_id,
+            extra_issues=_rolling_issues(
+                project,
+                parsed,
+                plan_payload=plan_payload,
+                eligible_ids=eligible_ids,
+                latest_final=latest_final,
+            ),
+        )
 
     envelope = _envelope_or_new(project, artifact_id, "rolling_patch", now=now)
     envelope = lifecycle.set_candidate(
@@ -1226,6 +1589,11 @@ def generate_rolling(
         now=now,
     )
     storage.save_artifact(project, envelope, operation_id=op_id)
+    if emitter is not None:
+        emitter.saved(
+            detail="Rolling proposal đã validate và lưu (chưa apply vào Short Plan).",
+            raw_ref=call.raw_ref,
+        )
     return ActionResult(
         operation_id=op_id,
         artifact_id=artifact_id,

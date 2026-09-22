@@ -127,17 +127,21 @@
         "relationships_as_of": [],
         "planning_scope": {
           "start": 1,
-          "end": 7
+          "end": 120
         },
         "assigned_volume_ids": [
-          "vol_0001"
+          "vol_0001",
+          "vol_0002",
+          "vol_0003"
         ],
         "assigned_arc_ids": [
           "arc_0001",
-          "arc_0002"
+          "arc_0002",
+          "arc_0003",
+          "arc_0004"
         ],
         "previous_long_plan": null,
-        "user_instruction": "Lập volume/arc đêm đầu từ chương 1 đến 7."
+        "user_instruction": "Lập Long Plan cho toàn horizon 1-120: nhận diện chuyển biến macro rồi phân rã volume/arc trước khi gán range."
       },
       "response": {
         "volumes": [
@@ -145,14 +149,14 @@
             "volume_id": "vol_0001",
             "title": "Nồi Canh Bên Đường",
             "theme": "Giữ quyền lựa chọn khi bị kéo vào một luật chơi lạ.",
-            "goal": "Đưa Sở Dương sống qua đêm đầu và hiểu giới hạn của hệ thống.",
+            "goal": "Đưa Sở Dương sống qua giai đoạn định vị và hiểu giới hạn của hệ thống.",
             "arcs": [
               {
                 "arc_id": "arc_0001",
                 "title": "Đêm đầu trên Vạn Linh sơn",
                 "chapter_range": {
                   "start": 1,
-                  "end": 7
+                  "end": 20
                 },
                 "goal": "Giới thiệu Sở Dương, cái nồi và hệ thống cưỡng chế.",
                 "core_conflict": "Sở Dương muốn tự quyết nhưng thân thể bị lệnh kéo đi.",
@@ -180,6 +184,130 @@
                     "arc_direction": "từ chưa gặp sang buộc phải hợp tác",
                     "target_state": "Miễn cưỡng tin nhau",
                     "notes": "Đây là plan tương lai, không phải current relationship."
+                  }
+                ]
+              },
+              {
+                "arc_id": "arc_0002",
+                "title": "Thành phố đầu tiên",
+                "chapter_range": {
+                  "start": 21,
+                  "end": 45
+                },
+                "goal": "Giành chỗ đứng trong thành phố bằng nghề và nguyên tắc.",
+                "core_conflict": "Luật thu thập đối đầu phản xạ cứu người.",
+                "start_state": "Có thân phận tạm thời và một đồng minh miễn cưỡng.",
+                "end_state": "Có vị thế mong manh nhưng phải nhận nghĩa vụ với người đã giúp.",
+                "major_reveals": [
+                  "Cái nồi phản ứng khác nhau với từng loại nguyên liệu đã gặp."
+                ],
+                "character_ids": [
+                  "char_0001",
+                  "char_0002"
+                ],
+                "world_rule_ids": [
+                  "rule_0001"
+                ],
+                "foreshadow_ids": [
+                  "fs_0001"
+                ],
+                "relationship_directions": [
+                  {
+                    "character_ids": [
+                      "char_0001",
+                      "char_0002"
+                    ],
+                    "arc_direction": "hợp tác có giới hạn sang chia sẻ rủi ro",
+                    "target_state": "Đồng minh có điều kiện",
+                    "notes": "Tiến ở năng lực phối hợp, chưa tiến ở thân mật."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "volume_id": "vol_0002",
+            "title": "Cái Giá Của Việc Cứu Người",
+            "theme": "Lòng tốt trở thành trách nhiệm tập thể.",
+            "goal": "Mở rộng phạm vi ảnh hưởng và cho thấy cái giá của việc đứng ra chịu trách nhiệm.",
+            "arcs": [
+              {
+                "arc_id": "arc_0003",
+                "title": "Tổ chức tự lập",
+                "chapter_range": {
+                  "start": 46,
+                  "end": 80
+                },
+                "goal": "Đưa nguyên tắc cá nhân thành lựa chọn của một nhóm.",
+                "core_conflict": "Cứu nhiều người nghĩa là phải bỏ rơi một số người.",
+                "start_state": "Có vị thế và đồng minh, còn tự do lựa chọn.",
+                "end_state": "Bị ràng buộc bởi chính tổ chức mình lập và phải trả giá cho lựa chọn.",
+                "major_reveals": [
+                  "Hệ thống thu thập có tầng ra lệnh phía sau giọng nói máy móc."
+                ],
+                "character_ids": [
+                  "char_0001",
+                  "char_0002"
+                ],
+                "world_rule_ids": [
+                  "rule_0001"
+                ],
+                "foreshadow_ids": [
+                  "fs_0001"
+                ],
+                "relationship_directions": [
+                  {
+                    "character_ids": [
+                      "char_0001",
+                      "char_0002"
+                    ],
+                    "arc_direction": "đồng minh có điều kiện sang đối tác chịu trách nhiệm chung",
+                    "target_state": "Đối tác có tranh chấp",
+                    "notes": "Bất đồng về cách cứu người vẫn còn; không xóa bằng một lần hy sinh."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "volume_id": "vol_0003",
+            "title": "Trả Giá Và Chọn Lại",
+            "theme": "Sự thật về hệ thống đối đầu điều nhân vật tin.",
+            "goal": "Đối đầu nguồn gốc hệ thống thu thập và để nhân vật chọn lại nguyên tắc sau khi biết sự thật.",
+            "arcs": [
+              {
+                "arc_id": "arc_0004",
+                "title": "Nguồn gốc cái nồi",
+                "chapter_range": {
+                  "start": 81,
+                  "end": 120
+                },
+                "goal": "Đóng vòng nhân quả của cái nồi trong giới hạn truth đã accepted.",
+                "core_conflict": "Sự thật về hệ thống đòi nhân vật từ bỏ đúng điều đã cứu anh.",
+                "start_state": "Mất quyền kiểm soát và mất một phần đồng minh.",
+                "end_state": "Chọn lại nguyên tắc sau khi biết sự thật, chấp nhận hệ quả còn lại.",
+                "major_reveals": [
+                  "Nguồn gốc cái nồi gắn với thân xác nguyên chủ đã được gieo từ trước."
+                ],
+                "character_ids": [
+                  "char_0001",
+                  "char_0002"
+                ],
+                "world_rule_ids": [
+                  "rule_0001"
+                ],
+                "foreshadow_ids": [
+                  "fs_0001"
+                ],
+                "relationship_directions": [
+                  {
+                    "character_ids": [
+                      "char_0001",
+                      "char_0002"
+                    ],
+                    "arc_direction": "đối tác có tranh chấp sang lựa chọn chung có điều kiện",
+                    "target_state": "Đồng minh tự nguyện",
+                    "notes": "Đích chỉ đạt nếu cả hai cùng trả giá, không phải phần thưởng tự đến."
                   }
                 ]
               }

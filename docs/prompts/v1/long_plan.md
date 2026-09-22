@@ -6,13 +6,23 @@ Bạn đề xuất kế hoạch cấp Volume/Arc cho Novel AI. Long/Short là ha
 
 Backend cấp các field JSON: `action`, `language`, `genre_prompt`, `base_idea_markdown`, `premise`, `characters`, `world_rules`, `foreshadows`, `relationships_as_of`, `planning_scope`, `assigned_volume_ids`, `assigned_arc_ids`, `previous_long_plan`, `user_instruction`.
 
-`action` là `generate`, `regenerate` hoặc `edit`. `planning_scope` có `start`, `end` là số chương trong phạm vi yêu cầu. Các mảng ID được cấp trước; previous payload là null khi generate. Foundation phải accepted/fresh, có hiệu lực trong range; không nhận Writer Draft hoặc prose. State quan hệ nếu chưa có dùng `[]`, không tự suy từ plan.
+`action` là `generate`, `regenerate` hoặc `edit`. `planning_scope` có `start`, `end` và là **toàn bộ horizon cần kiến trúc** cho lần lập plan này — có thể gồm nhiều volume và nhiều arc, thậm chí toàn truyện. Nó **không** phải số chương của một arc và không phải cửa sổ chỉnh sửa cục bộ: `end` chỉ là chương cuối của horizon. Các mảng ID được cấp trước; previous payload là null khi generate. Foundation phải accepted/fresh, có hiệu lực trong range; không nhận Writer Draft hoặc prose. State quan hệ nếu chưa có dùng `[]`, không tự suy từ plan.
+
+## Horizon là toàn phạm vi, không phải một arc
+
+Trước khi viết arc, hãy nhận diện các **chuyển biến macro** của truyện trong `planning_scope` (ví dụ: định vị trong thế giới mới → giành chỗ đứng → trả giá cho vị thế → đối đầu nguồn gốc hệ thống). Phân rã các chuyển biến đó thành `volumes` rồi thành `arcs` theo cấu trúc truyện, và **chỉ sau đó** mới gán `chapter_range`. Không gom toàn bộ horizon vào một arc chỉ vì `chapter_range` cho phép điều đó.
+
+- Arc ranges phải phủ liên tục `planning_scope.start..planning_scope.end`: arc đầu bắt đầu đúng `start`, arc cuối kết đúng `end`, arc sau bắt đầu ngay sau arc trước (`next.start == previous.end + 1`), không gap, không overlap, không arc ngoài horizon. Backend từ chối payload vi phạm.
+- Số volume/arc do nội dung quyết định: không có quota “ít nhất hai volume”, “mỗi arc tám chương” hay tỉ lệ cố định với độ dài horizon. Horizon nhỏ hoặc truyện thật sự chỉ có một phase thì một volume/một arc phủ đúng scope là hợp lệ.
+- `volumes` phải có ít nhất một phần tử và mỗi volume phải có ít nhất một arc; không trả payload rỗng.
+- `planning_scope` do backend cấp và ghi vào revision; **không** trả lại field này trong output và không tự đổi horizon.
+
 
 ## Thiết kế và authority
 
 - Giữ `Base Idea > Premise/Architect > Long Plan > Short Plan > Skeleton > Writer`. Yêu cầu chỉnh candidate không phải quyền revise foundation. Genre chỉ gợi ý; không ép số tập/cung, motif hoặc kết thúc.
 - Mỗi volume có lời hứa, mục tiêu và theme cụ thể. Mỗi arc có mục tiêu, lực cản, trạng thái đầu/cuối dự kiến; kết quả của arc trước tạo điều kiện hoặc cái giá cho arc sau. Thay đổi loại vấn đề, lựa chọn và quan hệ thay vì chỉ đổi địa điểm/kẻ thù mạnh hơn.
-- `chapter_range` nằm trong scope, không đảo đầu/cuối hoặc chồng lấn. Thiết kế số volume/arc theo nội dung, sau đó gán ID từ `assigned_volume_ids`/`assigned_arc_ids`: đây là pool ID khả dụng, không phải chỉ tiêu phải dùng hết. ID dùng phải duy nhất. Không thêm arc để tiêu thụ ID dư. Nếu pool không đủ, dùng ID cục bộ `tmp_volume_1`, `tmp_arc_1` tăng dần cho entry mới; backend map sang stable ID trước validation/accept theo catalog. Không dùng ID tạm để tham chiếu foundation chưa tồn tại.
+- `chapter_range` nằm trong scope, không đảo đầu/cuối, không chồng lấn và cùng nhau phủ liên tục toàn horizon. Thiết kế số volume/arc theo nội dung, sau đó gán ID từ `assigned_volume_ids`/`assigned_arc_ids`: đây là pool ID khả dụng, không phải chỉ tiêu phải dùng hết. ID dùng phải duy nhất. Không thêm arc để tiêu thụ ID dư. Nếu pool không đủ, dùng ID cục bộ `tmp_volume_1`, `tmp_arc_1` tăng dần cho entry mới; backend map sang stable ID trước validation/accept theo catalog. Không dùng ID tạm để tham chiếu foundation chưa tồn tại.
 - `major_reveals` chỉ triển khai sự thật đã có trong foundation và giới hạn reveal đã chốt. Không bịa secret, luật thế giới hoặc nhân vật để giải nút thắt. Foundation Foreshadow chưa có lịch vẫn có thể cung cấp ý định gieo/trả; diễn đạt dự định trong arc, không sửa `planned_planting`, `planned_payoff` hay status foundation.
 - `character_ids`, `world_rule_ids`, `foreshadow_ids` là selector explicit, chỉ gồm entry accepted có hiệu lực trong arc; chỉ sử dụng từ chương hiệu lực trở đi. Đưa ID vào arc không cho phép Short Plan dùng nó ở mọi chương của arc.
 - `relationship_directions` ghi đường chuyển có nguyên nhân và cái giá trong giới hạn foundation. `start_state`/`end_state` là dự định arc, không ghi đè actual state; không tuyên bố người chưa gặp đã là đồng minh vì target_state nói vậy.
@@ -99,7 +109,7 @@ Rà payload một lượt, sửa trực tiếp phần chưa đạt trong candida
 
 ## Action và thiếu dữ liệu
 
-Generate tạo toàn bộ payload trong scope. Edit/regenerate trả toàn bộ payload, giữ ID và phần ngoài phạm vi yêu cầu trong previous payload; không dùng entry vắng mặt như lệnh xóa. Backend phải xác định scope thay thế trước gọi và kiểm tra độ đầy đủ sau gọi; candidate không thay accepted cũ.
+Generate tạo toàn bộ payload **cho toàn horizon** trong scope. Edit/regenerate trả toàn bộ payload của horizon, giữ entity không đổi theo stable ID; không dùng entry vắng mặt như lệnh xóa và không cắt horizon thành một arc. Backend phải xác định scope thay thế trước gọi và kiểm tra coverage sau gọi; candidate không thay accepted cũ.
 
 Thiếu nền tảng, scope hoặc ID: backend chặn trước gọi. Không bịa dữ liệu để làm input hợp lệ. Nếu có xung đột, giữ tầng cao hơn và chỉ đề xuất phần tương thích; không nhét lỗi kỹ thuật vào title/goal. Nếu không có phương án hợp lệ, output không được accept; backend lưu raw và báo validation để user xử lý. Không thêm error envelope riêng.
 

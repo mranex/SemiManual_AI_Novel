@@ -7,10 +7,15 @@ trạng thái (draft/accepted/stale/partial) test được mà không cần UI.
 Cây phải phản ánh **metadata lifecycle**, không suy từ sự tồn tại của file:
 một `skeleton.json` có mặt nhưng `status = draft` vẫn hiển thị là candidate.
 
-Pane trái của shell vẽ **cây thật** (group = `st.expander`, node = dòng có dấu
-đậm + glyph trạng thái) thay vì danh sách radio phẳng: `st.radio` không lồng
-được và không hiển thị được thứ bậc. Chọn một node chỉ là nêu **ngữ cảnh đang
-xem** và gợi ý workspace liên quan; đổi workspace vẫn do navbar quyết định.
+Pane trái của shell vẽ **cây thật** (group cấp ngoài = `st.expander`, tầng sâu
+hơn = dòng có dấu đậm + glyph trạng thái + tiền tố nhánh) thay vì danh sách radio
+phẳng: `st.radio` không lồng được và không hiển thị được thứ bậc. Chọn một node
+chỉ là nêu **ngữ cảnh đang xem** và gợi ý workspace liên quan; đổi workspace vẫn
+do navbar quyết định.
+
+Bất biến render (BUG-001): **không bao giờ** lồng `st.expander` trong
+`st.expander`. Streamlit 1.41 raise `StreamlitAPIException` và làm sập toàn shell
+ngay khi project có chapter metadata, nên nhánh sâu dùng markdown có tiền tố.
 """
 
 from __future__ import annotations
@@ -318,17 +323,62 @@ def node_count(nodes: Iterable[TreeNode]) -> int:
     return sum(1 for node in flatten(nodes) if node.kind != "group")
 
 
-def _render_group(node: TreeNode, selected: str | None) -> None:
+#: Tiền tố nhánh cho tầng con của cây (thay cho expander lồng nhau — BUG-001).
+_BRANCH_PREFIX: tuple[str, str] = ("├─", "└─")
+
+
+def subtree_contains(node: TreeNode, key: str | None) -> bool:
+    """True nếu `key` là chính node hoặc nằm trong bất kỳ descendant nào."""
+    if key is None:
+        return False
+    if node.key == key:
+        return True
+    return any(subtree_contains(child, key) for child in node.children)
+
+
+def _branch_line(node: TreeNode, *, is_last: bool) -> str:
+    """Dòng con của một nhánh: tiền tố cây + nội dung markdown của node."""
+    return f"{_BRANCH_PREFIX[1] if is_last else _BRANCH_PREFIX[0]} {node_line(node)}"
+
+
+def _render_group(node: TreeNode, selected: str | None, *, nested: bool) -> None:
+    """Vẽ một nhánh cây với **tối đa một tầng** `st.expander`.
+
+    Streamlit 1.41 cấm expander lồng nhau; BUG-001 làm sập toàn shell ngay khi
+    project có chapter metadata (nhóm `Chapters` mở expander, rồi từng chapter có
+    children mở expander thứ hai). Vì vậy chỉ tầng ngoài cùng dùng expander; tầng
+    sâu hơn render bằng dòng markdown có tiền tố nhánh, giữ nguyên hierarchy
+    group → chapter → skeleton/reconciliation.
+    """
     import streamlit as st
 
     children = [child for child in node.children if child.kind != "group"]
     label = f"{node.label} ({len(children)})"
-    with st.expander(label, expanded=any(child.key == selected for child in children)):
-        for child in node.children:
-            if child.children:
-                _render_group(child, selected)
-            else:
-                st.markdown(node_line(child))
+    # Nhóm có chapter là vùng đang làm việc: mở sẵn để cây không bị ẩn mặc định.
+    expanded = subtree_contains(node, selected) or any(
+        child.kind == "chapter" for child in node.children
+    )
+
+    def _render_children() -> None:
+        for index, child in enumerate(node.children):
+            is_last = index == len(node.children) - 1
+            if not child.children:
+                st.markdown(_branch_line(child, is_last=is_last))
+                continue
+            st.markdown(node_line(child))
+            for inner_index, grandchild in enumerate(child.children):
+                st.markdown(
+                    _branch_line(
+                        grandchild, is_last=inner_index == len(child.children) - 1
+                    )
+                )
+
+    if nested:
+        st.markdown(f"**{label}**")
+        _render_children()
+        return
+    with st.expander(label, expanded=expanded):
+        _render_children()
 
 
 def render(project: Project, *, key: str = "project_tree") -> TreeNode | None:
@@ -354,24 +404,37 @@ def render(project: Project, *, key: str = "project_tree") -> TreeNode | None:
     )
     for node in nodes:
         if node.children:
-            _render_group(node, selected_node.key if selected_node else None)
+            _render_group(
+                node, selected_node.key if selected_node else None, nested=False
+            )
         else:
             st.markdown(node_line(node))
 
     leaves = [node for node in rows if node.kind != "group"]
     if leaves:
         options = [node.key for node in leaves]
-        labels = {node.key: f"{node_glyph(node)} {node.label} — {node.badge}" for node in leaves}
+        # Node con của chapter (`Skeleton`/`Reconciliation`) có cùng nhãn ở mọi
+        # chapter, nên nhãn selectbox phải kèm chapter để chọn đúng ngữ cảnh.
+        chapter_titles = {
+            node.key: node.label for node in rows if node.kind == "chapter"
+        }
+        labels = {}
+        for node in leaves:
+            suffix = ""
+            if node.chapter_id and node.chapter_id in chapter_titles:
+                suffix = f" · {chapter_titles[node.chapter_id]}"
+            labels[node.key] = f"{node_glyph(node)} {node.label}{suffix} — {node.badge}"
         widget_key = f"{key}_selection"
-        extra: dict[str, object] = {"key": widget_key, "label_visibility": "collapsed"}
-        if st.session_state.get(widget_key) not in options:
-            extra["index"] = None
+        # Không truyền `index` động: `index` nằm trong công thức element id của
+        # Streamlit, nên đổi nó giữa các rerun làm widget mất state và lựa chọn
+        # người dùng vừa bấm bị reset về option đầu. Mặc định ổn định (option đầu)
+        # + widget state của Streamlit là đường duy nhất giữ lựa chọn qua rerun.
         choice = st.selectbox(
             "Node đang xem",
             options,
             format_func=lambda value: labels.get(value, value),
-            placeholder="Chọn node để xem ngữ cảnh…",
-            **extra,
+            key=widget_key,
+            label_visibility="collapsed",
         )
         st.session_state[key] = choice
         selected_node = by_key.get(str(choice)) if choice else None

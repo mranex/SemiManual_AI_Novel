@@ -41,9 +41,16 @@ def _source() -> PayloadSource:
 
 
 def _accepted_premise(title: str = "Nồi Canh") -> object:
-    envelope = lifecycle.new_artifact("premise", "premise")
+    # `now=_STAMP` (không dùng đồng hồ thật): nếu `created_at` lấy giờ hệ thống thì hai
+    # lần gọi "cùng nội dung" ở test idempotency có thể lệch nhau khi qua giây, làm
+    # `save_artifact` từ chối vì hash khác — test flaky theo đồng hồ (phát hiện ở T40).
+    envelope = lifecycle.new_artifact("premise", "premise", now=_STAMP)
     candidate = lifecycle.set_candidate(
-        envelope, {"title": title, "logline": "L"}, source=_source(), validation=_valid()
+        envelope,
+        {"title": title, "logline": "L"},
+        source=_source(),
+        validation=_valid(),
+        now=_STAMP,
     )
     return lifecycle.accept_candidate(candidate, validation=_valid(), now=_STAMP)
 

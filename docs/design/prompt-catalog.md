@@ -696,3 +696,57 @@ Script rà manifest/catalog/schema section/link, mọi JSON example v1/catalog v
 [writer_skeleton_projection_cases.json](examples/writer_skeleton_projection_cases.json) bổ sung hai ca biên soạn từ chính hai section JSON trong Skeleton v1: hint cái nồi và partial reveal dấu niêm. Fixture giữ source_section để đối chiếu nhưng request chỉ chứa projection; source author notes/purpose kín không gửi Writer. ID tmp_section_1 của ví dụ thiết kế được giả định backend map thành section_0003 trước accepted/Writer. Không thêm field type/index/reveal_policy vào request Writer hoặc thay schema để chứa ví dụ.
 
 Kiểm tra tự động đối chiếu source section, field instruction/notes/beats/forbidden_moves, surface strings, ID stable và inline examples; không test bằng cách đếm heading/độ dài prompt. Rà thủ công prose: thao tác cọ–gõ–kiểm tra lại thực hiện hint mà không giải thích; cảnh dấu niêm thực hiện kết luận được phép mà không nêu thủ phạm/động cơ. Hai output là minh họa do người biên soạn viết, chưa gọi LLM. Bộ kiểm tra T06 hiện có 10 ca gốc + 2 ca projection, 6 fixture JSON files, 33 JSON blocks và 10 negative probes; regression T05 giữ 9 ca và 5 negative probes.
+
+## 9. Remediation contract T29 — 2026-09-22
+
+Mục này chốt phần prompt/UI bị ảnh hưởng bởi D016–D019. Nó **không** thay input registry, output
+schema hay luật prompt v1 ở các mục trên; chỉ bổ sung ràng buộc còn thiếu và ghi rõ giới hạn.
+
+### 9.1. Long Plan — `planning_scope` là complete horizon (D017)
+
+Wording bắt buộc có trong `docs/prompts/v1/long_plan.md` (T30 thực thi):
+
+1. `planning_scope.start/end` là **toàn horizon cần kiến trúc** cho lần lập plan này: có thể gồm
+   nhiều volume và nhiều arc, thậm chí toàn truyện. Nó **không** phải số chương của một arc và
+   không phải cửa sổ chỉnh sửa cục bộ.
+2. Trình tự làm việc: nhận diện các **chuyển biến macro** của truyện trong horizon → phân rã
+   thành volume/arc theo các chuyển biến đó → **sau đó** mới gán `chapter_range` sao cho phủ
+   liên tục, không gap, không overlap, đúng `start..end`.
+3. Không gom cả horizon vào một arc chỉ vì `chapter_range` cho phép. Không áp quota số
+   volume/arc/chương — số lượng do cấu trúc truyện quyết định.
+4. Edit/regenerate trả **full payload của horizon**, giữ entity không đổi theo stable ID.
+5. Model **không** trả `planning_scope` trong payload; app ghi field này vào revision.
+
+Giới hạn đã biết: prompt không chứng minh được chất lượng phân rã. Validator chỉ kiểm cấu trúc
+(coverage/`volume` rỗng/FK). Warning one-arc là tín hiệu UX non-blocking, không phải semantic
+validator và không đổi Auto Accept.
+
+### 9.2. Short Plan — contract viết đủ ba field (D016)
+
+`docs/prompts/v1/short_plan.md` giữ nguyên yêu cầu: object `{language, pov, length_guidance}`
+trong `outline` phải **echo đúng** giá trị backend cấp. Bổ sung ràng buộc: model **không** được
+tự chọn POV/độ dài, không được để rỗng, và không được đổi giá trị — khác giá trị cấp ⇒ output
+invalid. Backend chặn trước khi gọi nếu contract chưa đủ (mục 5.6 của `workflow.md`), nên prompt
+không còn là lớp duy nhất.
+
+### 9.3. Stream event và structured output
+
+Prompt v1 vẫn là một request/response theo schema; không prompt nào được yêu cầu streaming,
+tool-call hay tự retry. Event `GenerationEvent` và state machine ở `schemas.md` mục 11.1–11.2 là
+**contract của adapter/service và UI** (D019), đặt trong bố cục workspace của D018 (generation
+surface ở trung tâm, không giả stream, editor ngay dưới surface), **không phải** hợp đồng mới cho
+prompt. Hệ quả cho tài liệu prompt:
+
+- structured JSON nhận qua stream chỉ là raw preview cho tới khi parse/validate xong;
+- provider không hỗ trợ streaming cho structured output ⇒ nhánh `non_streaming`, không giả delta;
+- không prompt nào được mô tả việc tự gửi request thứ hai sau partial.
+
+### 9.4. Fixture và kiểm tra tài liệu
+
+[t29_contract_cases.json](examples/t29_contract_cases.json) chứa ví dụ multi-volume/arc, gap,
+uncovered edge, empty payload, overlap, out-of-scope, plan một arc hợp lệ, revision legacy thiếu
+scope, default viết hợp lệ và override sai. [check_t29_contracts.py](examples/check_t29_contracts.py)
+là **document checker**: nó rà fixture theo luật đã ghi ở `schemas.md` mục 3.1/3.3/3.4 và 11, và
+đối chiếu decision ID D016–D019 có mặt trong `decisions.md` cùng các tài liệu liên quan. Script
+này **không** thay validator runtime và không chứng minh backend đã implement.
+

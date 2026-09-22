@@ -1,0 +1,521 @@
+{
+  "schema_version": 1,
+  "task": "T29",
+  "created": "2026-09-22",
+  "note": "Fixture tài liệu cho contract D016-D019. check_t29_contracts.py rà các case này theo luật đã ghi ở docs/design/schemas.md và docs/design/workflow.md. Đây không phải executable JSON Schema và không chứng minh runtime đã implement.",
+  "long_plan_cases": [
+    {
+      "case_id": "multi_volume_gap_free",
+      "expect": "valid",
+      "single_arc_warning": false,
+      "planning_scope": { "start": 1, "end": 120 },
+      "payload": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Quyển 1",
+            "theme": "Sống sót và định vị",
+            "goal": "Sở Dương hiểu luật chơi của Thương Ngô giới.",
+            "arcs": [
+              {
+                "arc_id": "arc_0001",
+                "title": "Arc mở đầu",
+                "chapter_range": { "start": 1, "end": 20 },
+                "goal": "Định vị nhân vật trong thân xác mới.",
+                "core_conflict": "Cưỡng chế thân thể và nguyên tắc cứu người.",
+                "start_state": "Tỉnh dậy, mất phương hướng.",
+                "end_state": "Chấp nhận luật chơi, giữ nguyên tắc.",
+                "major_reveals": ["rev_0001"],
+                "character_ids": ["char_0001"],
+                "world_rule_ids": ["rule_0001"],
+                "foreshadow_ids": ["fs_0001"],
+                "relationship_directions": []
+              },
+              {
+                "arc_id": "arc_0002",
+                "title": "Arc thành phố đầu tiên",
+                "chapter_range": { "start": 21, "end": 45 },
+                "goal": "Giành chỗ đứng trong thành phố.",
+                "core_conflict": "Luật thu thập đối đầu lòng thương người.",
+                "start_state": "Có thân phận tạm thời.",
+                "end_state": "Có đồng minh đầu tiên.",
+                "major_reveals": ["rev_0002"],
+                "character_ids": ["char_0001"],
+                "world_rule_ids": ["rule_0001"],
+                "foreshadow_ids": ["fs_0001"],
+                "relationship_directions": []
+              }
+            ]
+          },
+          {
+            "volume_id": "vol_0002",
+            "title": "Quyển 2",
+            "theme": "Cái giá của việc cứu người",
+            "goal": "Mở rộng phạm vi ảnh hưởng và cái giá đi kèm.",
+            "arcs": [
+              {
+                "arc_id": "arc_0003",
+                "title": "Arc mở rộng",
+                "chapter_range": { "start": 46, "end": 80 },
+                "goal": "Đưa nguyên tắc cá nhân thành lựa chọn tập thể.",
+                "core_conflict": "Cứu nhiều người nghĩa là bỏ rơi một số người.",
+                "start_state": "Có đồng minh, còn tự do lựa chọn.",
+                "end_state": "Bị ràng buộc bởi chính tổ chức mình lập.",
+                "major_reveals": ["rev_0003"],
+                "character_ids": ["char_0001"],
+                "world_rule_ids": ["rule_0001"],
+                "foreshadow_ids": ["fs_0001"],
+                "relationship_directions": []
+              }
+            ]
+          },
+          {
+            "volume_id": "vol_0003",
+            "title": "Quyển 3",
+            "theme": "Trả giá và chọn lại",
+            "goal": "Đối đầu nguồn gốc hệ thống thu thập.",
+            "arcs": [
+              {
+                "arc_id": "arc_0004",
+                "title": "Arc kết",
+                "chapter_range": { "start": 81, "end": 120 },
+                "goal": "Đóng vòng nhân quả của cái nồi.",
+                "core_conflict": "Sự thật về hệ thống đối đầu điều nhân vật tin.",
+                "start_state": "Mất quyền kiểm soát.",
+                "end_state": "Chọn lại nguyên tắc sau khi biết sự thật.",
+                "major_reveals": ["rev_0004"],
+                "character_ids": ["char_0001"],
+                "world_rule_ids": ["rule_0001"],
+                "foreshadow_ids": ["fs_0001"],
+                "relationship_directions": []
+              }
+            ]
+          }
+        ],
+        "global_threads": []
+      }
+    },
+    {
+      "case_id": "single_arc_covers_horizon",
+      "expect": "valid",
+      "single_arc_warning": true,
+      "planning_scope": { "start": 1, "end": 40 },
+      "payload": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Quyển 1",
+            "theme": "Một pha duy nhất",
+            "goal": "Phủ trọn horizon nhỏ.",
+            "arcs": [
+              {
+                "arc_id": "arc_0001",
+                "title": "Arc duy nhất",
+                "chapter_range": { "start": 1, "end": 40 },
+                "goal": "Phủ đúng scope.",
+                "core_conflict": "Xung đột chính.",
+                "start_state": "Bắt đầu.",
+                "end_state": "Kết thúc.",
+                "major_reveals": [],
+                "character_ids": ["char_0001"],
+                "world_rule_ids": ["rule_0001"],
+                "foreshadow_ids": ["fs_0001"],
+                "relationship_directions": []
+              }
+            ]
+          }
+        ],
+        "global_threads": []
+      }
+    },
+    {
+      "case_id": "gap_in_scope",
+      "expect": "invalid",
+      "code": "gap_in_scope",
+      "planning_scope": { "start": 1, "end": 40 },
+      "payload": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Quyển 1",
+            "theme": "Có lỗ hổng",
+            "goal": "Minh họa gap.",
+            "arcs": [
+              {
+                "arc_id": "arc_0001",
+                "title": "Arc A",
+                "chapter_range": { "start": 1, "end": 20 },
+                "goal": "A",
+                "core_conflict": "A",
+                "start_state": "A",
+                "end_state": "A",
+                "major_reveals": [],
+                "character_ids": [],
+                "world_rule_ids": [],
+                "foreshadow_ids": [],
+                "relationship_directions": []
+              },
+              {
+                "arc_id": "arc_0002",
+                "title": "Arc B",
+                "chapter_range": { "start": 22, "end": 40 },
+                "goal": "B",
+                "core_conflict": "B",
+                "start_state": "B",
+                "end_state": "B",
+                "major_reveals": [],
+                "character_ids": [],
+                "world_rule_ids": [],
+                "foreshadow_ids": [],
+                "relationship_directions": []
+              }
+            ]
+          }
+        ],
+        "global_threads": []
+      }
+    },
+    {
+      "case_id": "uncovered_scope_start",
+      "expect": "invalid",
+      "code": "uncovered_scope_start",
+      "planning_scope": { "start": 1, "end": 120 },
+      "payload": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Quyển 1",
+            "theme": "Thiếu đầu",
+            "goal": "Minh họa thiếu coverage đầu.",
+            "arcs": [
+              {
+                "arc_id": "arc_0001",
+                "title": "Arc muộn",
+                "chapter_range": { "start": 20, "end": 120 },
+                "goal": "Arc",
+                "core_conflict": "Arc",
+                "start_state": "Arc",
+                "end_state": "Arc",
+                "major_reveals": [],
+                "character_ids": [],
+                "world_rule_ids": [],
+                "foreshadow_ids": [],
+                "relationship_directions": []
+              }
+            ]
+          }
+        ],
+        "global_threads": []
+      }
+    },
+    {
+      "case_id": "uncovered_scope_end",
+      "expect": "invalid",
+      "code": "uncovered_scope_end",
+      "planning_scope": { "start": 1, "end": 120 },
+      "payload": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Quyển 1",
+            "theme": "Thiếu cuối",
+            "goal": "Minh họa thiếu coverage cuối.",
+            "arcs": [
+              {
+                "arc_id": "arc_0001",
+                "title": "Arc sớm",
+                "chapter_range": { "start": 1, "end": 100 },
+                "goal": "Arc",
+                "core_conflict": "Arc",
+                "start_state": "Arc",
+                "end_state": "Arc",
+                "major_reveals": [],
+                "character_ids": [],
+                "world_rule_ids": [],
+                "foreshadow_ids": [],
+                "relationship_directions": []
+              }
+            ]
+          }
+        ],
+        "global_threads": []
+      }
+    },
+    {
+      "case_id": "empty_long_plan",
+      "expect": "invalid",
+      "code": "empty_long_plan",
+      "planning_scope": { "start": 1, "end": 120 },
+      "payload": { "volumes": [], "global_threads": [] }
+    },
+    {
+      "case_id": "empty_volume",
+      "expect": "invalid",
+      "code": "empty_volume",
+      "planning_scope": { "start": 1, "end": 40 },
+      "payload": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Quyển rỗng",
+            "theme": "Rỗng",
+            "goal": "Minh họa volume không có arc.",
+            "arcs": []
+          }
+        ],
+        "global_threads": []
+      }
+    },
+    {
+      "case_id": "overlap",
+      "expect": "invalid",
+      "code": "overlap",
+      "planning_scope": { "start": 1, "end": 40 },
+      "payload": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Quyển 1",
+            "theme": "Chồng lấn",
+            "goal": "Minh họa overlap.",
+            "arcs": [
+              {
+                "arc_id": "arc_0001",
+                "title": "Arc A",
+                "chapter_range": { "start": 1, "end": 20 },
+                "goal": "A",
+                "core_conflict": "A",
+                "start_state": "A",
+                "end_state": "A",
+                "major_reveals": [],
+                "character_ids": [],
+                "world_rule_ids": [],
+                "foreshadow_ids": [],
+                "relationship_directions": []
+              },
+              {
+                "arc_id": "arc_0002",
+                "title": "Arc B",
+                "chapter_range": { "start": 20, "end": 40 },
+                "goal": "B",
+                "core_conflict": "B",
+                "start_state": "B",
+                "end_state": "B",
+                "major_reveals": [],
+                "character_ids": [],
+                "world_rule_ids": [],
+                "foreshadow_ids": [],
+                "relationship_directions": []
+              }
+            ]
+          }
+        ],
+        "global_threads": []
+      }
+    },
+    {
+      "case_id": "out_of_scope_arc",
+      "expect": "invalid",
+      "code": "out_of_scope_arc",
+      "planning_scope": { "start": 1, "end": 40 },
+      "payload": {
+        "volumes": [
+          {
+            "volume_id": "vol_0001",
+            "title": "Quyển 1",
+            "theme": "Vượt scope",
+            "goal": "Minh họa arc ngoài horizon.",
+            "arcs": [
+              {
+                "arc_id": "arc_0001",
+                "title": "Arc trong scope",
+                "chapter_range": { "start": 1, "end": 40 },
+                "goal": "A",
+                "core_conflict": "A",
+                "start_state": "A",
+                "end_state": "A",
+                "major_reveals": [],
+                "character_ids": [],
+                "world_rule_ids": [],
+                "foreshadow_ids": [],
+                "relationship_directions": []
+              },
+              {
+                "arc_id": "arc_0002",
+                "title": "Arc ngoài scope",
+                "chapter_range": { "start": 41, "end": 50 },
+                "goal": "B",
+                "core_conflict": "B",
+                "start_state": "B",
+                "end_state": "B",
+                "major_reveals": [],
+                "character_ids": [],
+                "world_rule_ids": [],
+                "foreshadow_ids": [],
+                "relationship_directions": []
+              }
+            ]
+          }
+        ],
+        "global_threads": []
+      }
+    }
+  ],
+  "legacy_cases": [
+    {
+      "case_id": "accepted_revision_with_scope",
+      "planning_scope": { "start": 1, "end": 10 },
+      "accepted_present": true,
+      "read": "allowed",
+      "generate": "allowed",
+      "accept": "allowed",
+      "auto_accept": "per_config",
+      "writes_on_open": false,
+      "code": null
+    },
+    {
+      "case_id": "accepted_revision_legacy",
+      "planning_scope": null,
+      "accepted_present": true,
+      "read": "allowed_with_legacy_label",
+      "generate": "blocked",
+      "accept": "blocked",
+      "auto_accept": "blocked",
+      "writes_on_open": false,
+      "code": "missing_planning_scope"
+    },
+    {
+      "case_id": "candidate_revision_legacy",
+      "planning_scope": null,
+      "accepted_present": false,
+      "read": "allowed_with_legacy_label",
+      "generate": "blocked",
+      "accept": "blocked",
+      "auto_accept": "blocked",
+      "writes_on_open": false,
+      "code": "missing_planning_scope"
+    },
+    {
+      "case_id": "confirm_horizon_retry_is_noop",
+      "planning_scope": { "start": 1, "end": 10 },
+      "accepted_present": true,
+      "read": "allowed",
+      "generate": "allowed",
+      "accept": "allowed",
+      "auto_accept": "per_config",
+      "writes_on_open": false,
+      "confirm_action": "no_op_when_scope_present",
+      "code": null
+    }
+  ],
+  "writing_default_cases": [
+    {
+      "case_id": "project_defaults_applied",
+      "project": {
+        "default_language": "vi",
+        "default_pov": "Ngôi thứ ba giới hạn theo Sở Dương",
+        "default_length_guidance": "1500-2000 từ"
+      },
+      "assigned_chapters": ["ch_0001", "ch_0002"],
+      "overrides": {},
+      "expect": "valid",
+      "code": null,
+      "llm_calls": 1
+    },
+    {
+      "case_id": "chapter_override_wins",
+      "project": {
+        "default_language": "vi",
+        "default_pov": "Ngôi thứ ba giới hạn theo Sở Dương",
+        "default_length_guidance": "1500-2000 từ"
+      },
+      "assigned_chapters": ["ch_0001", "ch_0002"],
+      "overrides": {
+        "ch_0002": { "pov": "Ngôi thứ nhất", "length_guidance": "800-1000 từ" }
+      },
+      "expect": "valid",
+      "code": null,
+      "llm_calls": 1
+    },
+    {
+      "case_id": "missing_default_and_override",
+      "project": {
+        "default_language": "vi",
+        "default_pov": "",
+        "default_length_guidance": ""
+      },
+      "assigned_chapters": ["ch_0001"],
+      "overrides": {},
+      "expect": "invalid",
+      "code": "missing_writing_contract",
+      "fields": ["pov", "length_guidance"],
+      "llm_calls": 0
+    },
+    {
+      "case_id": "unknown_chapter_constraint",
+      "project": {
+        "default_language": "vi",
+        "default_pov": "Ngôi thứ ba giới hạn",
+        "default_length_guidance": "1200 từ"
+      },
+      "assigned_chapters": ["ch_0001"],
+      "overrides": {
+        "ch_0099": { "pov": "Ngôi thứ nhất", "length_guidance": "500 từ" }
+      },
+      "expect": "invalid",
+      "code": "unknown_chapter_constraint",
+      "fields": [],
+      "llm_calls": 0
+    },
+    {
+      "case_id": "duplicate_chapter_constraint",
+      "project": {
+        "default_language": "vi",
+        "default_pov": "Ngôi thứ ba giới hạn",
+        "default_length_guidance": "1200 từ"
+      },
+      "assigned_chapters": ["ch_0001", "ch_0002"],
+      "overrides": {
+        "ch_0001": { "pov": "Ngôi thứ nhất" }
+      },
+      "duplicate_chapters": ["ch_0001"],
+      "expect": "invalid",
+      "code": "duplicate_chapter_constraint",
+      "fields": [],
+      "llm_calls": 0
+    },
+    {
+      "case_id": "legacy_project_without_defaults",
+      "project": { "default_language": "vi" },
+      "assigned_chapters": ["ch_0001"],
+      "overrides": {},
+      "expect": "invalid",
+      "code": "missing_writing_contract",
+      "fields": ["pov", "length_guidance"],
+      "llm_calls": 0
+    }
+  ],
+  "generation_event_states": [
+    "idle",
+    "connecting",
+    "non_streaming",
+    "streaming",
+    "transport_complete",
+    "validating",
+    "saved",
+    "partial",
+    "invalid",
+    "error"
+  ],
+  "generation_terminal_states": ["saved", "partial", "invalid", "error"],
+  "candidate_ready_states": ["saved"],
+  "editor_working_copy_rules": [
+    "session_scope_project_artifact_revision",
+    "save_writes_candidate_only",
+    "manual_save_never_auto_accepts",
+    "auto_accepted_output_shows_accepted_and_revise",
+    "stale_working_copy_rejected",
+    "roundtrip_keeps_unknown_optional_fields",
+    "raw_json_uses_same_service_validation"
+  ]
+}

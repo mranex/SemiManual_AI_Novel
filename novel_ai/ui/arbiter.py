@@ -439,6 +439,34 @@ def format_artifact_statuses(report: ArbiterReport) -> Mapping[str, str]:
     return dict(report.artifact_status)
 
 
+def badge_summary(report: ArbiterReport) -> str:
+    """Nhãn compact cho control Arbiter ở toolbar (T32, UI-04).
+
+    Hàm thuần, chỉ đọc report: đếm blocker/stale/recovery/rolling để user thấy mức
+    độ quan trọng **khi panel đang đóng**. Không đổi rule hay priority của Arbiter.
+    """
+    parts: list[str] = []
+    if report.read_only:
+        parts.append("read-only")
+    elif report.needs_recovery:
+        parts.append("cần recovery")
+    blockers = sum(1 for suggestion in report.suggestions if suggestion.blocking)
+    if blockers:
+        parts.append(f"{blockers} blocker")
+    if report.stale_artifact_ids:
+        parts.append(f"{len(report.stale_artifact_ids)} stale")
+    if report.rolling_due:
+        parts.append("rolling due")
+    if not parts:
+        parts.append("không blocker")
+    return " · ".join(parts)
+
+
+def compact_label(report: ArbiterReport) -> str:
+    """Nhãn nút compact: `Arbiter · <badge summary>`."""
+    return f"Arbiter · {badge_summary(report)}"
+
+
 # ---------------------------------------------------------------------------
 # Panel Arbiter (spec mục 28–29)
 # ---------------------------------------------------------------------------

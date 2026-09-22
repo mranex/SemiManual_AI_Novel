@@ -83,8 +83,10 @@ from novel_ai.core.models import (
     now_iso,
 )
 from novel_ai.core.prompts import PromptRegistry, render_prompt
+from novel_ai.core.generation import EventSink, GenerationEmitter
 from novel_ai.core.project import Project
 from novel_ai.core.storage import load_co_create, read_json
+from novel_ai.services.co_create import transport_complete_seam
 from novel_ai.services import (
     ActionResult,
     GuardError,
@@ -694,6 +696,9 @@ def generate_reconciliation(
     operation_id: str | None = None,
     now: str | None = None,
     _refresh: bool = False,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Sinh proposal reconciliation cho chapter đang `finalizing`.
 
@@ -704,7 +709,9 @@ def generate_reconciliation(
     `accept_reconciliation`.
 
     Schema sai/ID không resolve/timeout: lưu raw + `StructuredOutputError`, giữ
-    chapter `finalizing`, accepted state không đổi.
+    chapter `finalizing`, accepted state không đổi. Stream lỗi sau khi đã có delta
+    cũng đi đúng đường này (raw partial được lưu, không commit, chapter vẫn
+    `finalizing`) nên retry không nhân đôi timeline/relationship.
 
     ``_refresh=True`` là đường nội bộ cho `revision.reconcile_downstream`: chapter
     đã `final_reconciled` và state N−1 vừa được rebuild, nên proposal không cần
@@ -735,18 +742,38 @@ def generate_reconciliation(
         prompt_version=rendered.prompt_version,
         prompt_hash=rendered.template_hash,
     )
-    try:
-        parsed, raw_text, error = generate_structured(
-            client, request, ReconciliationPayload
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action="reconcile.proposal",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=RECONCILE_PROMPT_ID,
+            artifact_id=_artifact_id_for_chapter(chapter_id),
+            chapter_id=chapter_id,
         )
-    except LLMError as exc:
-        raise LLMUnavailableError(
-            f"Gọi LLM cho reconciliation thất bại: {exc}",
-            code=getattr(exc, "code", "llm_unavailable"),
-            details={"chapter_id": chapter_id, "operation_id": op_id},
-        ) from exc
+        if on_event is not None
+        else None
+    )
+    complete, holder = transport_complete_seam(
+        project,
+        client=client,
+        operation_id=op_id,
+        label=f"reconcile_{chapter_id}",
+        emitter=emitter,
+        stream=stream,
+        now=now,
+        prompt_id=RECONCILE_PROMPT_ID,
+    )
+    # `generate_structured` phát phần transport (qua seam ở trên) rồi parse; chỉ sau
+    # khi transport xong mới vào bước `validating`.
+    parsed, raw_text, error = generate_structured(
+        client, request, ReconciliationPayload, complete=complete
+    )
+    if emitter is not None:
+        emitter.validating(detail="Đang parse/validate Reconciliation proposal.")
 
-    raw_ref = storage.save_raw_output(
+    raw_ref = holder.get("raw_ref") or storage.save_raw_output(
         project,
         operation_id=op_id,
         text=raw_text,
@@ -778,6 +805,14 @@ def generate_reconciliation(
         detail = "; ".join(
             f"{item.path}: {item.message}" for item in record.errors
         ) or "output không khớp schema"
+        if emitter is not None:
+            emitter.invalid(
+                detail=(
+                    "Reconciliation proposal không hợp lệ: chapter vẫn `finalizing`, "
+                    "chương sau vẫn khóa, không commit."
+                ),
+                raw_ref=raw_ref,
+            )
         return ActionResult(
             operation_id=op_id,
             artifact_id=_artifact_id_for_chapter(chapter_id),
@@ -818,6 +853,14 @@ def generate_reconciliation(
             now=now,
             refresh=_refresh,
         )
+        if emitter is not None:
+            emitter.invalid(
+                detail=(
+                    "Reconciliation proposal sai contract/ID: chapter vẫn `finalizing`, "
+                    "không commit."
+                ),
+                raw_ref=raw_ref,
+            )
         return ActionResult(
             operation_id=op_id,
             artifact_id=_artifact_id_for_chapter(chapter_id),
@@ -863,6 +906,14 @@ def generate_reconciliation(
             now=now,
         )
         auto_accepted_revision = accepted.data.get("committed_revision")
+        if emitter is not None:
+            emitter.saved(
+                detail=(
+                    "Reconciliation proposal đã validate và auto-accept theo config; "
+                    "chapter `final_reconciled`."
+                ),
+                raw_ref=raw_ref,
+            )
         return ActionResult(
             operation_id=op_id,
             artifact_id=envelope.artifact_id,
@@ -881,6 +932,14 @@ def generate_reconciliation(
             },
         )
 
+    if emitter is not None:
+        emitter.saved(
+            detail=(
+                "Reconciliation proposal đã validate và lưu candidate `draft` (chưa accept, "
+                "chapter vẫn `finalizing`)."
+            ),
+            raw_ref=raw_ref,
+        )
     return ActionResult(
         operation_id=op_id,
         artifact_id=envelope.artifact_id,

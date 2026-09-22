@@ -20,16 +20,18 @@ from typing import Any
 
 from novel_ai.core import storage
 from novel_ai.services import ServiceError, reconcile
-from novel_ai.ui import page_header, set_action_result, show_action_result
+from novel_ai.ui import generation, page_header, set_action_result, show_action_result
 from novel_ai.ui.layout import AppContext
 
 from . import _chapter_ui, _common
 
 __all__ = [
     "KEY_ACCEPT",
+    "KEY_ADD_RELATIONSHIP",
     "KEY_ATTEMPT",
     "KEY_CANCEL",
     "KEY_CHAPTER",
+    "KEY_EDIT_FORM",
     "KEY_EDIT_JSON",
     "KEY_GENERATE",
     "KEY_REJECT",
@@ -40,10 +42,13 @@ __all__ = [
 
 KEY_CHAPTER = "novel_ai_reconcile_chapter"
 KEY_ATTEMPT = "novel_ai_reconcile_attempt"
+KEY_STREAM = "novel_ai_reconcile_stream"
 KEY_GENERATE = "novel_ai_reconcile_generate"
 KEY_RETRY = "novel_ai_reconcile_retry"
 KEY_RELOAD_JSON = "novel_ai_reconcile_reload_json"
 KEY_EDIT_JSON = "novel_ai_reconcile_edit_json"
+KEY_EDIT_FORM = "novel_ai_reconcile_edit_form"
+KEY_ADD_RELATIONSHIP = "novel_ai_reconcile_add_relationship"
 KEY_ACCEPT = "novel_ai_reconcile_accept"
 KEY_REJECT = "novel_ai_reconcile_reject"
 KEY_CANCEL = "novel_ai_reconcile_cancel"
@@ -95,7 +100,19 @@ def render(ctx: AppContext) -> None:
 
     _render_pending_panel(project, chapter_id)
     _render_proposal_panel(ctx, chapter_id)
-    _render_actions_panel(ctx, chapter_id)
+    scoped = generation.scope_key(
+        project_id=project.config.project_id,
+        workspace="reconcile",
+        artifact_id=f"reconciliation_{chapter_id}",
+    )
+    surface = generation.start_surface(
+        scoped,
+        transcript=generation.load_transcript(scoped),
+        project=project,
+        chapter_id=chapter_id,
+        title="AI Generation — Reconciliation",
+    )
+    _render_actions_panel(ctx, chapter_id, surface=surface)
 
 
 def _render_queue_panel(project: Any, queue: list[Any], rows: list[dict[str, Any]]) -> None:
@@ -151,8 +168,130 @@ def _render_pending_panel(project: Any, chapter_id: str) -> None:
             st.code(text or "(không đọc được file final candidate)", language="text")
 
 
+def _form_prefix(key: str) -> str:
+    """Prefix widget của form Reconciliation (raw editor giữ nguyên key `key`)."""
+    return f"{key}__form"
+
+
+def _working_key(key: str) -> str:
+    """Khóa session giữ working payload (relationship update thêm/bớt chưa Save)."""
+    return f"{key}__working"
+
+
+def _blank_relationship_update() -> dict[str, Any]:
+    """Dòng relationship update mới: chưa có `relationship_id`, commit tự resolve theo cặp."""
+    return {"relationship_id": None, "character_ids": [], "current": ""}
+
+
+def _working_payload(key: str, version: Any, candidate_payload: Any) -> dict[str, Any]:
+    """Working payload của form (giữ thay đổi cấu trúc khi rerun/đổi tab)."""
+    import streamlit as st
+
+    stored = st.session_state.get(_working_key(key))
+    if isinstance(stored, dict) and stored.get("version") == version:
+        payload = stored.get("payload")
+        if isinstance(payload, dict):
+            return dict(payload)
+    payload = candidate_payload.model_dump(mode="json")
+    st.session_state[_working_key(key)] = {"version": version, "payload": payload}
+    return payload
+
+
+def _store_working(key: str, version: Any, payload: dict[str, Any]) -> None:
+    import streamlit as st
+
+    st.session_state[_working_key(key)] = {"version": version, "payload": payload}
+
+
+def _render_form_editor(
+    project: Any,
+    chapter_id: str,
+    candidate: Any,
+    *,
+    key: str,
+    version: Any,
+) -> None:
+    """Form Reconciliation: timeline là group, relationship là card theo cặp ID.
+
+    Save gọi `reconcile.edit_reconciliation_candidate` nên schema/ID/freshness và
+    guard `finalizing` giữ nguyên luật; form **không** commit, không đổi timeline/
+    relationship thật.
+    """
+    import streamlit as st
+
+    from novel_ai.core.models import ReconciliationPayload
+    from novel_ai.ui import editor
+
+    prefix = _form_prefix(key)
+    payload = _working_payload(key, version, candidate.payload)
+    selectors = _common.selector_options(project)
+    st.caption(
+        "Timeline là **group field** của chương đang finalize; `relationship_updates` là card "
+        "theo cặp stable ID (multiselect lấy từ accepted foundation). `chapter_id`/"
+        "`chapter_number`/`source_final_candidate` do app quản lý (read-only)."
+    )
+    edited = editor.render_model_form(
+        ReconciliationPayload, payload, key_prefix=prefix, depth=0, selectors=selectors
+    )
+    st.info(
+        "`relationship_id` để trống nghĩa là backend resolve/tạo quan hệ theo đúng cặp "
+        "character ID khi commit; điền ID sai cặp sẽ bị validator từ chối."
+    )
+    updates = list(edited.get("relationship_updates") or [])
+    remove_flags: list[bool] = []
+    if updates:
+        st.markdown("**Bỏ relationship update khỏi working copy** (chỉ áp dụng khi Save)")
+        for position in range(len(updates)):
+            row = updates[position] or {}
+            label = str(row.get("relationship_id") or f"cặp {row.get('character_ids') or '—'}")
+            remove_flags.append(
+                bool(
+                    st.checkbox(
+                        f"Bỏ {label}",
+                        key=f"{prefix}__remove_{position}",
+                    )
+                )
+            )
+    if st.button("Thêm relationship update", key=KEY_ADD_RELATIONSHIP):
+        updates.append(_blank_relationship_update())
+        _store_working(key, version, {**edited, "relationship_updates": updates})
+        _common.clear_session_keys_with_prefix(prefix)
+        st.rerun()
+    if not st.button("Lưu proposal (form)", key=KEY_EDIT_FORM):
+        return
+    kept = [row for position, row in enumerate(updates) if not remove_flags[position]]
+    payload_to_save = {**edited, "relationship_updates": kept}
+    intent = (chapter_id, _chapter_ui.payload_fingerprint(payload_to_save))
+    try:
+        blocked, result = _chapter_ui.run_action(
+            KEY_EDIT_FORM,
+            intent=intent,
+            project=project,
+            call=lambda: reconcile.edit_reconciliation_candidate(
+                project,
+                chapter_id=chapter_id,
+                payload=payload_to_save,
+                operation_id=_chapter_ui.stable_operation_id("reconcile", "edit_form", *intent),
+            ),
+        )
+    except ServiceError as error:
+        _common.render_service_error(
+            error,
+            next_step=(
+                "Sửa đúng field/cặp ID được nêu ở trên rồi lưu lại. Chapter vẫn `finalizing`, "
+                "timeline/relationship chưa đổi và nội dung đang sửa không bị mất."
+            ),
+        )
+        return
+    if blocked:
+        return
+    set_action_result(result)
+    _common.clear_session_keys_with_prefix(key)
+    st.rerun()
+
+
 def _render_proposal_panel(ctx: AppContext, chapter_id: str) -> None:
-    """JSON proposal: sửa tay rồi validate lại qua service (accepted không đổi)."""
+    """Editor proposal: form schema-aware (T39) + raw JSON nâng cao, cùng service guard."""
     import streamlit as st
 
     project = ctx.project
@@ -192,22 +331,27 @@ def _render_proposal_panel(ctx: AppContext, chapter_id: str) -> None:
         chapter_id,
         f"c{candidate.revision}:{_chapter_ui.payload_fingerprint(candidate.payload)}",
     )
-    if st.button("Nạp lại JSON từ candidate", key=KEY_RELOAD_JSON):
-        _common.clear_session_keys(key, f"{key}__source")
+    if st.button("Nạp lại editor từ candidate", key=KEY_RELOAD_JSON):
+        _common.clear_session_keys_with_prefix(key)
         st.rerun()
-    text = _common.sync_text_editor(
-        key, _common.payload_json_text(candidate.payload), version=version
-    )
-    edited = st.text_area(
-        "Proposal JSON (sửa tay được; backend validate lại theo schema/ID/freshness)",
-        value=text,
-        height=320,
-        key=key,
-    )
-    st.caption(
-        "Sửa tay **không** commit gì: proposal vẫn là candidate cho tới khi bạn bấm Accept."
-    )
-    if not st.button("Lưu JSON đã sửa (validate lại)", key=KEY_EDIT_JSON):
+
+    form_tab, raw_tab = st.tabs(["Editor (form)", "JSON thô (sửa)"])
+    with form_tab:
+        _render_form_editor(project, chapter_id, candidate, key=key, version=version)
+    with raw_tab:
+        _common.sync_text_editor(
+            key, _common.payload_json_text(candidate.payload), version=version
+        )
+        edited = st.text_area(
+            "Proposal JSON (sửa tay được; backend validate lại theo schema/ID/freshness)",
+            height=320,
+            key=key,
+        )
+        st.caption(
+            "Sửa tay **không** commit gì: proposal vẫn là candidate cho tới khi bạn bấm Accept."
+        )
+        raw_save = st.button("Lưu JSON đã sửa (validate lại)", key=KEY_EDIT_JSON)
+    if not raw_save:
         return
     payload, parse_error = _common.parse_json_payload(edited)
     if parse_error:
@@ -242,17 +386,27 @@ def _render_proposal_panel(ctx: AppContext, chapter_id: str) -> None:
     if blocked:
         return
     set_action_result(result)
-    _common.clear_session_keys(key, f"{key}__source")
+    _common.clear_session_keys_with_prefix(key)
     st.rerun()
 
 
-def _render_actions_panel(ctx: AppContext, chapter_id: str) -> None:
+def _render_actions_panel(
+    ctx: AppContext, chapter_id: str, *, surface: generation.GenerationSurface
+) -> None:
     import streamlit as st
 
     project = ctx.project
     assert project is not None
     st.subheader("Action reconciliation")
     attempt = _chapter_ui.attempt_input(KEY_ATTEMPT)
+    can_stream = _chapter_ui.stream_supported(ctx.llm_client)
+    stream = st.checkbox(
+        "Stream (hiện raw JSON theo từng delta)",
+        value=bool(can_stream),
+        key=KEY_STREAM,
+        disabled=not can_stream,
+        help="Proposal chỉ được parse/validate sau khi stream hoàn tất; commit vẫn là action riêng.",
+    )
 
     llm_ready = ctx.llm_client is not None and ctx.registry is not None
     generate_col, retry_col = st.columns(2)
@@ -288,6 +442,16 @@ def _render_actions_panel(ctx: AppContext, chapter_id: str) -> None:
         action = "generate" if generate_clicked else "retry"
         intent = (chapter_id, action, int(attempt))
         operation_id = _chapter_ui.stable_operation_id("reconcile", *intent)
+        transcript, on_event = generation.recorder_for(
+            surface,
+            action="reconcile.proposal",
+            operation_id=operation_id,
+            stream=bool(stream),
+            attempt=int(attempt),
+            artifact_id=f"reconciliation_{chapter_id}",
+            chapter_id=chapter_id,
+            project=project,
+        )
         try:
             if generate_clicked:
                 blocked, result = _chapter_ui.run_action(
@@ -299,6 +463,9 @@ def _render_actions_panel(ctx: AppContext, chapter_id: str) -> None:
                         client=client,
                         chapter_id=chapter_id,
                         operation_id=operation_id,
+                        on_event=on_event,
+                        stream=bool(stream),
+                        attempt=int(attempt),
                     ),
                 )
             else:
@@ -311,6 +478,9 @@ def _render_actions_panel(ctx: AppContext, chapter_id: str) -> None:
                         client=client,
                         chapter_id=chapter_id,
                         operation_id=operation_id,
+                        on_event=on_event,
+                        stream=bool(stream),
+                        attempt=int(attempt),
                     ),
                 )
         except ServiceError as error:
@@ -321,7 +491,9 @@ def _render_actions_panel(ctx: AppContext, chapter_id: str) -> None:
                     "nếu đã có proposal, hoặc Cancel finalizing."
                 ),
             )
+            surface.render(transcript, project=project, chapter_id=chapter_id)
         else:
+            surface.render(transcript, project=project, chapter_id=chapter_id)
             if blocked:
                 return
             set_action_result(result)

@@ -28,15 +28,17 @@ from novel_ai.core.models import (
     IdeaState,
 )
 from novel_ai.services import ServiceError, co_create
-from novel_ai.ui import page_header, set_action_result, show_action_result
+from novel_ai.ui import generation, page_header, set_action_result, show_action_result
 from novel_ai.ui.layout import AppContext
 
-from . import _common
+from . import _chapter_ui, _common
 
 __all__ = ["build_working_state_inputs", "render"]
 
 #: Khóa session state của page (chỉ UI working state, không phải canon).
 KEY_TURN_MESSAGE = "novel_ai_co_create_message"
+KEY_TURN_STREAM = "novel_ai_co_create_stream"
+KEY_TURN_ATTEMPT = "novel_ai_co_create_attempt"
 KEY_FINALIZE_MARKDOWN = "novel_ai_co_create_finalize_markdown"
 
 #: Khóa widget biểu mẫu working state; user bấm "Nạp lại" thì các khóa này bị xoá.
@@ -142,8 +144,15 @@ def render(ctx: AppContext) -> None:
     document = _document(project)
     base_idea_markdown, base_idea_meta = _read_base_idea(project)
 
+    scoped = generation.scope_key(
+        project_id=project.config.project_id, workspace="co_create", artifact_id="co_create"
+    )
+    surface = generation.start_surface(
+        scoped, transcript=generation.load_transcript(scoped), project=project
+    )
+
     _render_status(document, base_idea_meta)
-    _render_chat(ctx, document)
+    _render_chat(ctx, document, surface=surface)
     _render_working_state(ctx, document)
     _render_finalize(ctx, document, base_idea_meta)
     _render_base_idea(base_idea_markdown, base_idea_meta, document)
@@ -176,7 +185,9 @@ def _render_status(document: CoCreateDocument, base_idea_meta: Any) -> None:
         )
 
 
-def _render_chat(ctx: AppContext, document: CoCreateDocument) -> None:
+def _render_chat(
+    ctx: AppContext, document: CoCreateDocument, *, surface: generation.GenerationSurface
+) -> None:
     import streamlit as st
 
     st.subheader("Hội thoại Co-create")
@@ -208,15 +219,47 @@ def _render_chat(ctx: AppContext, document: CoCreateDocument) -> None:
             key=KEY_TURN_MESSAGE,
             placeholder="Ví dụ: Tôi muốn truyện tiên hiệp hài, nhân vật chính là bác sĩ cấp cứu…",
         )
+        can_stream = _chapter_ui.stream_supported(ctx.llm_client)
+        stream = st.checkbox(
+            "Stream (hiện raw JSON theo từng delta)",
+            value=bool(can_stream),
+            key=KEY_TURN_STREAM,
+            disabled=not can_stream,
+            help=(
+                "Structured JSON chỉ được parse/validate sau khi stream hoàn tất."
+                if can_stream
+                else "Client hiện tại không có `stream`."
+            ),
+        )
+        attempt = _chapter_ui.attempt_input(KEY_TURN_ATTEMPT)
         submitted = st.form_submit_button("Gửi lượt co-create")
     if not submitted:
         return
     if not str(message or "").strip():
         st.error("Cần nhập tin nhắn trước khi gửi lượt co-create.")
         return
+    operation_id = _chapter_ui.stable_operation_id(
+        "co_create", "turn", str(message or "").strip(), int(attempt)
+    )
+    transcript, on_event = generation.recorder_for(
+        surface,
+        action="co_create",
+        operation_id=operation_id,
+        stream=bool(stream),
+        attempt=int(attempt),
+        artifact_id="co_create",
+        prompt_id="co_create.v1",
+        project=ctx.project,
+    )
     try:
         result = co_create.run_turn(
-            ctx.project, client=ctx.llm_client, user_message=str(message)
+            ctx.project,
+            client=ctx.llm_client,
+            user_message=str(message),
+            operation_id=operation_id,
+            on_event=on_event,
+            stream=bool(stream),
+            attempt=int(attempt),
         )
     except ServiceError as error:
         _common.render_service_error(
@@ -226,7 +269,9 @@ def _render_chat(ctx: AppContext, document: CoCreateDocument) -> None:
                 "accepted không bị thay đổi bởi lần gửi lỗi."
             ),
         )
+        surface.render(transcript, project=ctx.project)
         return
+    surface.render(transcript, project=ctx.project)
     set_action_result(result)
     st.rerun()
 

@@ -62,6 +62,8 @@ from novel_ai.services import (
     StaleDependencyError,
     ValidationFailure,
 )
+from novel_ai.core.generation import EventSink, GenerationEmitter
+from novel_ai.services.co_create import generation_stage, structured_transport
 
 __all__ = [
     "SKELETON_PROMPT_ID",
@@ -391,20 +393,39 @@ def generate(
     user_instruction: str = "",
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Sinh Skeleton candidate cho một chapter từ `skeleton.v1`.
 
     Candidate **không** bao giờ được auto accept, kể cả khi project bật Auto
     Accept và cả khi candidate là provisional. Raw output được lưu trước parse;
-    schema sai chỉ tạo lỗi validation, accepted cũ giữ nguyên.
+    schema sai chỉ tạo lỗi validation, accepted cũ giữ nguyên. `on_event` nhận
+    `GenerationEvent` theo contract T33/D019.
     """
     stamp = now or now_iso()
     op_id = operation_id or generate_operation_id()
     chapter = _require_chapter(project, chapter_id)
     artifact_id = _skeleton_artifact_id(chapter_id)
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action=f"skeleton.{action}",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=SKELETON_PROMPT_ID,
+            artifact_id=artifact_id,
+            chapter_id=chapter_id,
+        )
+        if on_event is not None
+        else None
+    )
 
     existing = _load_operation_record(project, chapter_id, op_id)
     if existing is not None:
+        if emitter is not None:
+            emitter.replay(detail="Operation Skeleton đã hoàn tất trước đó; replay theo operation_id.")
         return _replay_result(existing, action=OPERATION_GENERATE)
 
     bundle = _skeleton_bundle(
@@ -419,49 +440,49 @@ def generate(
         prompt_hash=rendered.template_hash,
     )
 
-    try:
-        response = client.complete(request)
-    except LLMError as exc:
-        raise LLMUnavailableError(
-            f"LLM lỗi khi sinh Skeleton: {exc}", code=exc.code, details=exc.details
-        ) from exc
-    raw_text = response.text if isinstance(response.text, str) else str(response.text)
-    raw_ref = storage.save_raw_output(
+    transport = structured_transport(
         project,
+        client=client,
+        request=request,
         operation_id=op_id,
-        text=raw_text,
         label=f"skeleton_{chapter_id}",
-        day=_day_of(stamp),
+        emitter=emitter,
+        stream=stream,
+        now=stamp,
+        prompt_id=SKELETON_PROMPT_ID,
     )
+    raw_text = transport.text
+    raw_ref = transport.raw_ref
 
-    try:
-        parsed = parse_structured_text(raw_text, SkeletonPayload)
-    except StructuredOutputParseError as exc:
-        raise ValidationFailure(
-            f"Skeleton output không parse/không đúng schema: {exc}. Raw đã lưu tại {raw_ref}.",
-            result=validation.result_from_issues(exc.errors),
-            code="structured_output_parse",
-            details={"raw_output_ref": raw_ref},
-        ) from exc
+    with generation_stage(emitter, detail="Đang parse/validate Skeleton."):
+        try:
+            parsed = parse_structured_text(raw_text, SkeletonPayload)
+        except StructuredOutputParseError as exc:
+            raise ValidationFailure(
+                f"Skeleton output không parse/không đúng schema: {exc}. Raw đã lưu tại {raw_ref}.",
+                result=validation.result_from_issues(exc.errors),
+                code="structured_output_parse",
+                details={"raw_output_ref": raw_ref},
+            ) from exc
 
-    payload, id_map = _map_temporary_section_ids(
-        parsed, project=project, chapter_id=chapter_id
-    )
-    if payload.chapter_id != chapter_id or payload.chapter_number != chapter.chapter_number:
-        raise ValidationFailure(
-            f"Skeleton output khai `{payload.chapter_id}`/chương {payload.chapter_number} "
-            f"nhưng action là `{chapter_id}`/chương {chapter.chapter_number}.",
-            code="skeleton_chapter_mismatch",
-            details={"raw_output_ref": raw_ref},
+        payload, id_map = _map_temporary_section_ids(
+            parsed, project=project, chapter_id=chapter_id
         )
-    result = _validate_skeleton(project, chapter, payload)
-    if not result.is_valid:
-        raise ValidationFailure(
-            "Skeleton candidate không qua validation: " + validation.summarize_errors(result),
-            result=result,
-            code="validation_failed",
-            details={"raw_output_ref": raw_ref, "id_map": id_map},
-        )
+        if payload.chapter_id != chapter_id or payload.chapter_number != chapter.chapter_number:
+            raise ValidationFailure(
+                f"Skeleton output khai `{payload.chapter_id}`/chương {payload.chapter_number} "
+                f"nhưng action là `{chapter_id}`/chương {chapter.chapter_number}.",
+                code="skeleton_chapter_mismatch",
+                details={"raw_output_ref": raw_ref},
+            )
+        result = _validate_skeleton(project, chapter, payload)
+        if not result.is_valid:
+            raise ValidationFailure(
+                "Skeleton candidate không qua validation: " + validation.summarize_errors(result),
+                result=result,
+                code="validation_failed",
+                details={"raw_output_ref": raw_ref, "id_map": id_map},
+            )
 
     # `preparation_context` là dấu app-owned cho biết candidate dựa trên basis nào.
     # Ghi dấu **trước** candidate để crash giữa chừng không thể tạo ra candidate
@@ -522,6 +543,14 @@ def generate(
         "created_at": stamp,
     }
     _save_operation_record(project, chapter_id, record, operation_id=op_id)
+    if emitter is not None:
+        emitter.saved(
+            detail=(
+                f"Skeleton candidate r{candidate_revision} đã validate và lưu "
+                "(luôn là candidate, không auto accept)."
+            ),
+            raw_ref=raw_ref,
+        )
     return ActionResult(
         operation_id=op_id,
         artifact_id=artifact_id,

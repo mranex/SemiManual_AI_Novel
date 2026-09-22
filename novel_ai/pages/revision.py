@@ -29,7 +29,7 @@ from typing import Any
 from novel_ai.core import storage
 from novel_ai.services import ServiceError, reconcile
 from novel_ai.services import revision as revision_service
-from novel_ai.ui import page_header, set_action_result, show_action_result
+from novel_ai.ui import editor, generation, page_header, set_action_result, show_action_result
 from novel_ai.ui.layout import AppContext
 
 from . import _chapter_ui, _common
@@ -100,6 +100,7 @@ KEY_IMPACT_AFTER = "novel_ai_revision_impact_after"
 KEY_IMPACT_SCOPE = "novel_ai_revision_impact_scope"
 KEY_IMPACT_ATTEMPT = "novel_ai_revision_impact_attempt"
 KEY_IMPACT_RUN = "novel_ai_revision_impact_run"
+KEY_IMPACT_STREAM = "novel_ai_revision_impact_stream"
 
 
 def render(ctx: AppContext) -> None:
@@ -217,7 +218,17 @@ def _render_blockers_panel(ctx: AppContext) -> None:
         for item in blockers
         if item.get("kind") in {"timeline_entry", "relationship"}
     ]
-    finalizing = [item for item in blockers if item.get("kind") == "chapter"]
+    finalizing = [
+        item
+        for item in blockers
+        if item.get("kind") == "chapter"
+        and item.get("suggested_action") == "generate_reconciliation"
+    ]
+    locked_next = [
+        item
+        for item in blockers
+        if item.get("kind") == "chapter" and item.get("suggested_action") == "finalize_chapter"
+    ]
 
     if artifacts:
         st.markdown("**Artifact stale** (review/reaccept hoặc regenerate):")
@@ -271,6 +282,17 @@ def _render_blockers_panel(ctx: AppContext) -> None:
         for item in finalizing:
             st.markdown(
                 f"- `{item.get('chapter_id')}` — {item.get('reason')} → workspace **Reconcile**."
+            )
+    if locked_next:
+        # Khác hẳn `finalizing`: chương này mới chỉ `planned`/`skeleton_ready`/`draft` nên
+        # Writer chương sau bị khóa; việc cần làm nằm ở Review (Finalize), không phải Reconcile.
+        st.markdown(
+            "**Chapter chưa `final_reconciled`** (Writer chương sau vẫn khóa):"
+        )
+        for item in locked_next:
+            st.markdown(
+                f"- `{item.get('chapter_id')}` — {item.get('reason')} → hoàn tất "
+                "**Review → Finalize → Reconcile** cho chương đó theo thứ tự."
             )
 
 
@@ -329,6 +351,31 @@ def _run_reconcile_downstream(ctx: AppContext, chapter_id: str) -> None:
         chapter.final_revision.revision if chapter is not None and chapter.final_revision else None,
         _chapter_ui.downstream_state_version(project),
     )
+    # UI-02 (T40): rebuild downstream cũng là action gọi LLM ⇒ dùng cùng generation
+    # surface thay vì chặn cứng trang, để transcript/partial/retry hiển thị như Reconcile.
+    scoped = generation.scope_key(
+        project_id=project.config.project_id,
+        workspace="revision",
+        artifact_id=f"reconciliation_{chapter_id}",
+    )
+    surface = generation.start_surface(
+        scoped,
+        transcript=generation.load_transcript(scoped),
+        project=project,
+        chapter_id=chapter_id,
+        title="AI Generation — Reconcile downstream",
+    )
+    operation_id = _chapter_ui.stable_operation_id("revision", "reconcile_downstream", *intent)
+    transcript, on_event = generation.recorder_for(
+        surface,
+        action="revision.reconcile_downstream",
+        # Cùng operation id với emitter của lượt generate proposal bên trong service.
+        operation_id=revision_service.downstream_proposal_operation_id(operation_id),
+        stream=False,
+        artifact_id=f"reconciliation_{chapter_id}",
+        chapter_id=chapter_id,
+        project=project,
+    )
     try:
         blocked, result = _chapter_ui.run_action(
             KEY_BLOCKER_DOWNSTREAM_PREFIX + chapter_id,
@@ -338,9 +385,8 @@ def _run_reconcile_downstream(ctx: AppContext, chapter_id: str) -> None:
                 project,
                 client=ctx.llm_client,
                 chapter_id=chapter_id,
-                operation_id=_chapter_ui.stable_operation_id(
-                    "revision", "reconcile_downstream", *intent
-                ),
+                operation_id=operation_id,
+                on_event=on_event,
             ),
         )
     except ServiceError as error:
@@ -351,7 +397,9 @@ def _run_reconcile_downstream(ctx: AppContext, chapter_id: str) -> None:
                 "lại theo thứ tự chương."
             ),
         )
+        surface.render(transcript, project=project, chapter_id=chapter_id)
         return
+    surface.render(transcript, project=project, chapter_id=chapter_id)
     if blocked:
         return
     set_action_result(result)
@@ -502,12 +550,23 @@ def _render_revise_base_idea(project: Any) -> None:
         st.caption("Chưa đọc được metadata Base Idea.")
     for line in _chapter_ui.upstream_stale_scope("base_idea"):
         st.markdown(f"- Hệ quả: {line}")
-    text = st.text_area(
-        "Base Idea (markdown) — bản mới sẽ là accepted revision mới",
-        value=current_text,
-        height=200,
-        key=KEY_BASE_IDEA_TEXT,
-    )
+    edit_tab, preview_tab = st.tabs(["Edit", "Preview"])
+    with edit_tab:
+        st.caption(
+            "Edit tạo **accepted revision mới** khi bạn bấm Revise; Preview chỉ đọc và không "
+            "ghi file. Đếm ký tự/từ chỉ mang tính tham khảo."
+        )
+        text = st.text_area(
+            "Base Idea (markdown) — bản mới sẽ là accepted revision mới",
+            value=current_text,
+            height=480,
+            key=KEY_BASE_IDEA_TEXT,
+        )
+        words = len(str(text or "").split())
+        st.caption(f"{len(str(text or ''))} ký tự · {words} từ")
+    with preview_tab:
+        st.caption("Preview bản đang sửa (không ghi file):")
+        st.markdown(str(text or current_text) or "_(rỗng)_")
     if not st.button("Revise Base Idea", key=KEY_REVISE_BASE):
         return
     if text.strip() and text.strip() == current_text.strip():
@@ -559,22 +618,42 @@ def _render_revise_premise(project: Any) -> None:
     )
     for line in _chapter_ui.upstream_stale_scope("premise"):
         st.markdown(f"- Hệ quả: {line}")
-    source_text = _common.payload_json_text(accepted.payload)
-    version = (accepted.revision, _chapter_ui.payload_fingerprint(accepted.payload))
-    text = _common.sync_text_editor(KEY_PREMISE_EDITOR, source_text, version=version)
-    edited = st.text_area(
-        "Premise (JSON) — sửa rồi gửi để tạo accepted revision mới + stale downstream",
-        value=text,
-        height=260,
-        key=KEY_PREMISE_EDITOR,
-    )
+    form_tab, raw_tab = st.tabs(["Form theo schema", "Raw JSON (nâng cao)"])
+    with form_tab:
+        st.caption(
+            "Sửa từng field của Premise (schema thật). Field `⚠ author-only` không được gửi "
+            "Writer; metadata/revision do app quản lý."
+        )
+        edited_payload = editor.render_artifact_form(
+            "premise",
+            accepted.payload.model_dump(mode="json"),
+            key_prefix=f"{KEY_PREMISE_EDITOR}__form",
+        )
+        if edited_payload != accepted.payload.model_dump(mode="json"):
+            st.caption("Form đang khác accepted hiện tại; bấm **Revise Premise** để gửi.")
+        else:
+            st.caption("Form đang trùng accepted hiện tại (backend sẽ không tạo revision mới).")
+    with raw_tab:
+        source_text = _common.payload_json_text(accepted.payload)
+        version = (accepted.revision, _chapter_ui.payload_fingerprint(accepted.payload))
+        text = _common.sync_text_editor(KEY_PREMISE_EDITOR, source_text, version=version)
+        edited = st.text_area(
+            "Premise (JSON) — sửa rồi gửi để tạo accepted revision mới + stale downstream",
+            height=260,
+            key=KEY_PREMISE_EDITOR,
+        )
     if not st.button("Revise Premise", key=KEY_REVISE_PREMISE):
         return
-    payload, parse_error = _common.parse_json_payload(edited)
-    if parse_error:
-        st.error(f"Chưa gửi được Premise revision: {parse_error}")
-        st.info("Sửa JSON trong editor (nội dung bạn nhập vẫn còn) rồi bấm lại.")
-        return
+    # Nguồn apply rõ ràng: form nếu form khác accepted, ngược lại dùng raw JSON.
+    payload: Any
+    if edited_payload != accepted.payload.model_dump(mode="json"):
+        payload = edited_payload
+    else:
+        payload, parse_error = _common.parse_json_payload(edited)
+        if parse_error:
+            st.error(f"Chưa gửi được Premise revision: {parse_error}")
+            st.info("Sửa JSON trong editor (nội dung bạn nhập vẫn còn) rồi bấm lại.")
+            return
     if _chapter_ui.payload_fingerprint(payload) == _chapter_ui.payload_fingerprint(
         accepted.payload
     ):
@@ -608,6 +687,7 @@ def _render_revise_premise(project: Any) -> None:
         return
     set_action_result(result)
     _common.clear_session_keys(KEY_PREMISE_EDITOR, f"{KEY_PREMISE_EDITOR}__source")
+    _common.clear_session_keys_with_prefix(f"{KEY_PREMISE_EDITOR}__form")
     st.rerun()
 
 
@@ -622,6 +702,17 @@ def _render_impact_panel(ctx: AppContext) -> None:
     project = ctx.project
     assert project is not None
     st.subheader("Impact report (chỉ trình bày)")
+    scoped = generation.scope_key(
+        project_id=project.config.project_id,
+        workspace="revision",
+        artifact_id="impact_report",
+    )
+    surface = generation.start_surface(
+        scoped,
+        transcript=generation.load_transcript(scoped),
+        project=project,
+        title="AI Generation — Impact report",
+    )
     st.caption(
         "Report là candidate `draft`: **không** tự apply, **không** tự đánh dấu stale. Việc "
         "đánh dấu stale thuộc backend deterministic (`mark_downstream_stale`)."
@@ -647,6 +738,14 @@ def _render_impact_panel(ctx: AppContext) -> None:
     after = st.text_area("Nội dung sau thay đổi (tuỳ chọn)", key=KEY_IMPACT_AFTER, height=100)
     scope = st.text_input("`analysis_scope` (tuỳ chọn)", key=KEY_IMPACT_SCOPE)
     attempt = _chapter_ui.attempt_input(KEY_IMPACT_ATTEMPT)
+    can_stream = _chapter_ui.stream_supported(ctx.llm_client)
+    stream = st.checkbox(
+        "Stream (hiện raw JSON theo từng delta)",
+        value=bool(can_stream),
+        key=KEY_IMPACT_STREAM,
+        disabled=not can_stream,
+        help="Report chỉ được parse/validate sau khi stream hoàn tất; report không tự apply.",
+    )
 
     if ctx.llm_client is None or ctx.registry is None:
         st.error("Chưa dùng được impact report: thiếu prompt registry hoặc LLM client.")
@@ -664,6 +763,18 @@ def _render_impact_panel(ctx: AppContext) -> None:
             str(scope or ""),
             int(attempt),
         )
+        operation_id = _chapter_ui.stable_operation_id(
+            "revision", "impact_report", source_change["item_id"], *intent
+        )
+        transcript, on_event = generation.recorder_for(
+            surface,
+            action="revision.impact_report",
+            operation_id=operation_id,
+            stream=bool(stream),
+            attempt=int(attempt),
+            artifact_id=f"impact_report_{source_change['item_id']}",
+            project=project,
+        )
         try:
             blocked, result = _chapter_ui.run_action(
                 KEY_IMPACT_RUN,
@@ -676,9 +787,10 @@ def _render_impact_panel(ctx: AppContext) -> None:
                     before_content=str(before or ""),
                     after_content=str(after or ""),
                     analysis_scope=str(scope or ""),
-                    operation_id=_chapter_ui.stable_operation_id(
-                        "revision", "impact_report", source_change["item_id"], *intent
-                    ),
+                    operation_id=operation_id,
+                    on_event=on_event,
+                    stream=bool(stream),
+                    attempt=int(attempt),
                 ),
             )
         except ServiceError as error:
@@ -689,7 +801,9 @@ def _render_impact_panel(ctx: AppContext) -> None:
                     "report lỗi."
                 ),
             )
+            surface.render(transcript, project=project)
         else:
+            surface.render(transcript, project=project)
             if blocked:
                 return
             set_action_result(result)

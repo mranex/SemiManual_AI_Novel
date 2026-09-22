@@ -78,6 +78,31 @@ def rolling(req, res):
     for b in res['blocked_by_authority']:
         exact(b, {'chapter_id','authority','reason'})
 
+def long_plan(req, res):
+    """Long Plan: field arc đúng, ID thuộc pool, và coverage phủ đúng horizon (T30)."""
+    exact(res, {'volumes','global_threads'})
+    assert res['volumes'], 'Long Plan phải có ít nhất một volume'
+    arcs = []
+    for v in res['volumes']:
+        exact(v,set('volume_id title theme goal arcs'.split()))
+        assert v['volume_id'] in req['assigned_volume_ids']
+        assert v['arcs'], f"volume {v['volume_id']} phải có ít nhất một arc"
+        for a in v['arcs']:
+            exact(a,set('arc_id title chapter_range goal core_conflict start_state end_state major_reveals character_ids world_rule_ids foreshadow_ids relationship_directions'.split()))
+            assert a['arc_id'] in req['assigned_arc_ids']
+            assert req['planning_scope']['start'] <= a['chapter_range']['start'] <= a['chapter_range']['end'] <= req['planning_scope']['end']
+            for d in a['relationship_directions']:
+                direction(d)
+            arcs.append(a)
+    ids=[a['arc_id'] for a in arcs]
+    assert len(ids)==len(set(ids)), 'arc_id phải duy nhất'
+    scope=req['planning_scope']
+    assert arcs[0]['chapter_range']['start']==scope['start'], 'arc đầu phải bắt đầu ở planning_scope.start'
+    assert arcs[-1]['chapter_range']['end']==scope['end'], 'arc cuối phải kết ở planning_scope.end'
+    for prev,cur in zip(arcs,arcs[1:]):
+        assert cur['chapter_range']['start']==prev['chapter_range']['end']+1, 'arc phải liên tục, không gap/overlap'
+
+
 json_blocks = 0
 for path in [*(ROOT/'docs/prompts/v1').rglob('*.md'), ROOT/'docs/design/prompt-catalog.md']:
     content = path.read_text(encoding='utf-8')
@@ -95,16 +120,7 @@ for c in cases.values():
     assert all(f'`{field}`' in prompt for field in fields)
     assert not re.search(r'novel_context|save_foundation|dispatch|audit_foundation',prompt)
     if c['prompt_id'] == 'long_plan.v1':
-        exact(res, {'volumes','global_threads'})
-        for v in res['volumes']:
-            exact(v,set('volume_id title theme goal arcs'.split()))
-            assert v['volume_id'] in req['assigned_volume_ids']
-            for a in v['arcs']:
-                exact(a,set('arc_id title chapter_range goal core_conflict start_state end_state major_reveals character_ids world_rule_ids foreshadow_ids relationship_directions'.split()))
-                assert a['arc_id'] in req['assigned_arc_ids']
-                assert req['planning_scope']['start'] <= a['chapter_range']['start'] <= a['chapter_range']['end'] <= req['planning_scope']['end']
-                for d in a['relationship_directions']:
-                    direction(d)
+        long_plan(req, res)
     elif c['prompt_id'] == 'short_plan.v1':
         basis(req,min(ch['chapter_number'] for ch in res['chapters']))
         exact(res, {'arc_id','chapters'})
@@ -165,6 +181,24 @@ for mutation in ('past','config','upstream'):
     else:
         raise AssertionError(f'Negative probe not rejected: {mutation}')
 
+# Negative probes cho coverage Long Plan (T30): horizon là toàn phạm vi, phải liên tục.
+for mutation in ('gap','uncovered_end','out_of_scope','empty_volume'):
+    c = copy.deepcopy(cases['long_plan'])
+    if mutation == 'gap':
+        c['response']['volumes'][0]['arcs'][0]['chapter_range']['end'] = 19
+    elif mutation == 'uncovered_end':
+        c['response']['volumes'][-1]['arcs'][-1]['chapter_range']['end'] = 119
+    elif mutation == 'out_of_scope':
+        c['response']['volumes'][-1]['arcs'][-1]['chapter_range']['end'] = 121
+    else:
+        c['response']['volumes'][1]['arcs'] = []
+    try:
+        long_plan(c['request'],c['response'])
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError(f'Negative probe not rejected: long_plan_{mutation}')
+
 # Inline teaching examples must be usable without loading the catalog at runtime.
 inline = {}
 for name in ('long_plan','short_plan','rolling_plan','skeleton'):
@@ -208,4 +242,4 @@ for kind in ('false_actual','duplicate_id'):
 for target in re.findall(r'\]\(([^)]+)\)',catalog):
     if '://' not in target:
         assert (ROOT/'docs/design'/target.split('#')[0]).exists(), target
-print(f'PASS: {len(cases)} request/response cases; {json_blocks} JSON blocks; 5 inline examples; provisional/actual separation, ID pools/local IDs, hint/partial reveal; catalog fields/links; 5 negative probes. Document checks only, no runtime validation.')
+print(f'PASS: {len(cases)} request/response cases; {json_blocks} JSON blocks; 5 inline examples; provisional/actual separation, ID pools/local IDs, hint/partial reveal; Long Plan complete-horizon coverage (multi-volume/arc 1-120); catalog fields/links; 9 negative probes. Document checks only, no runtime validation.')

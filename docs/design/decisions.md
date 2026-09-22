@@ -1,6 +1,6 @@
 # Workflow decisions
 
-Phiên bản: 2026-09-19. Đi cùng `workflow.md`.
+Phiên bản: 2026-09-22 (T29 bổ sung D016–D019). Đi cùng `workflow.md`.
 
 Tài liệu này ghi các quyết định triển khai của T01. Các quyết định ở đây không sửa spec gốc; chúng làm rõ interpretation để các task sau triển khai nhất quán.
 
@@ -123,3 +123,138 @@ T06 tạo manifest explicit cho cả 14 prompt, 6 genre, style default độc l�
 Rewrite theo schema T02: JSON chứa replacement_markdown, notes, changed_intent; chỉ phần prose thay thế trong field đó, không trả toàn chương, không auto-apply khi auto_accept_structured bật. Review/Impact là report; Reconcile chỉ actual từ final candidate và prior N−1. Cụ thể hóa nested types tại schemas mục 10, input/guard tại catalog mục 8; không đổi spec hay top-level payload.
 
 Writer thiếu dữ liệu không được nhét lỗi vào manuscript: backend chặn trước gọi; fallback output rỗng phải bị coi incomplete, không review_required. Kiểm tra tĩnh không chứng minh tuân thủ ngữ nghĩa. T02 relationship fixture chương 1 tham chiếu char hiệu lực 2 được ghi là hạn chế ví dụ lịch sử, không dùng để nới contract effective filtering.
+
+## D016 — Default viết lưu theo project, override từng chương (2026-09-22, T29)
+
+**Nguồn:** quyết định user ngày 2026-09-22 trong phiên review prototype, ghi ở
+`FIX_IMPLEMENTATION_PLAN.md` mục 3.1 và `docs/bugs/BUG-003-missing-length-guidance-reaches-short-plan-api.md`.
+Quyết định này **thay riêng** phần “không thêm project config” của D013; phần còn lại của D013 giữ nguyên.
+
+Quyết định:
+
+1. `project.json` có thêm hai field app-owned, do user nhập:
+   - `default_pov` — string, mặc định `""`;
+   - `default_length_guidance` — string, mặc định `""`.
+   Ngôn ngữ tiếp tục dùng `default_language` hiện có; **không** thêm field ngôn ngữ mới.
+   App không bịa số từ hay POV: giá trị rỗng là “chưa thiết lập”, không phải một default ngầm.
+2. Project cũ thiếu hai field vẫn mở và đọc được (field optional, default rỗng). Không auto
+   migrate khi mở, không tự điền từ accepted chapter/Skeleton đã có.
+3. Giá trị hiệu lực của một chapter = `override của chương` nếu người dùng nhập, ngược lại
+   `default của project`; kết quả cuối vẫn là object `{language, pov, length_guidance}` ba
+   string **không rỗng** theo D013/schemas mục 4.
+4. `Save default` là action tường minh, chỉ ghi `project.json`, **không** gọi LLM, không tạo
+   candidate và không sửa accepted chapter contract. Đổi default **không** rewrite Short Plan
+   đã accepted; default chỉ là input cho request mới.
+5. Guard nằm ở backend và chạy **trước** `build_short_plan_context()`/`complete_json()`: đủ
+   constraint cho **mọi** assigned chapter, không thừa/không trùng ID, cả ba field không rỗng.
+   Thiếu/sai ⇒ `GuardError` với code ổn định + chapter/field cụ thể, `client.calls == []`,
+   không tạo raw record và không đổi accepted state. Guard này hoạt động cả khi gọi service
+   trực tiếp, không phụ thuộc session state hay nút UI.
+6. Model không được thay contract đã cấp: nếu output trả `pov`/`length_guidance` khác giá trị
+   hiệu lực, candidate bị coi invalid (`invalid_outline_contract_item`) — validation sau API
+   vẫn giữ, nhưng không còn là lớp bảo vệ duy nhất.
+
+Hệ quả: T31 sửa `pages/short_plan.py` + `services/short_planner.py` + `core/models.py`
+(`ProjectConfig`) theo contract này; fixture phải có case missing/duplicate/out-of-scope →
+zero LLM call. Không thêm database, không thêm config ngoài `project.json`.
+
+## D017 — `planning_scope` là complete horizon và được lưu theo revision (2026-09-22, T29)
+
+**Nguồn:** `docs/bugs/BUG-004-long-plan-horizon-collapses-into-one-arc.md` và yêu cầu user
+ghi ở `FIX_IMPLEMENTATION_PLAN.md` mục 3.2.
+
+Quyết định:
+
+1. `planning_scope = {start, end}` là **toàn bộ horizon mà Long Plan phải kiến trúc** — có thể
+   gồm nhiều volume/arc hoặc toàn truyện. Nó **không** phải số chương của một arc, không phải
+   edit window, và không được suy từ `current_chapter`, Short Plan hay chapter metadata.
+2. `planning_scope` là **metadata app-owned**, lưu ở `ArtifactRevision.planning_scope` (xem
+   `schemas.md` mục 1.3), **không** nằm trong `LongPlanPayload` do LLM trả. LLM và form không
+   được sửa field này; service ghi nó khi tạo candidate và Accept giữ nguyên giá trị đó.
+3. Initial horizon do user chọn rõ (input bắt buộc ở UI). Truyền thiếu ⇒ `GuardError`
+   `missing_planning_scope`; không còn default ngầm `1..3`. Regenerate/edit không truyền scope
+   thì dùng `planning_scope` của accepted revision.
+4. Candidate phải phủ đúng horizon: `volumes` không rỗng, mỗi volume có ≥ 1 arc, arc theo thứ
+   tự volume→arc, `first.start == scope.start`, `last.end == scope.end`, liên tục
+   (`next.start == prev.end + 1`), không overlap, không out-of-scope. Validate ở generate,
+   regenerate, edit, accept, auto accept và lần revalidate sau reload — **cùng một hàm**.
+5. Edit/regenerate trả **full payload của horizon**, giữ entity không đổi theo stable ID.
+   Không còn hai nghĩa “phần ngoài scope cần giữ”: mọi arc ngoài horizon là lỗi, không phải
+   vùng merge.
+6. Số volume/arc do cấu trúc truyện quyết định. **Không quota** (“ít nhất 2 volume”, “mỗi arc
+   8 chương”). Một arc phủ đúng horizon là **hợp lệ về cấu trúc**; UI hiện warning
+   non-blocking khi cả plan chỉ có một arc và **không** mô tả warning đó là semantic validator.
+7. Warning **không** đổi Auto Accept: auto accept vẫn theo config sau full structural
+   validation. Backend không tuyên bố đánh giá được chất lượng phân rã narrative.
+8. Revision/candidate legacy thiếu `planning_scope` vẫn **đọc/xem** được nhưng là `legacy`:
+   không được coi min/max arc hiện có là horizon gốc đã xác nhận, không auto migrate khi mở,
+   và mọi generate/regenerate/accept trên nó đòi user chạy action xác nhận horizon tường minh
+   (xem bảng compatibility ở `schemas.md` mục 3.4). Migration phải retry an toàn, có snapshot,
+   và không tự sửa manuscript.
+
+Hệ quả: T30 sửa `long_planner.py`, `models.py`, `validation.py`, `pages/long_plan.py`,
+`docs/prompts/v1/long_plan.md` và fixture/checker tài liệu. Warning one-arc và preview coverage
+thuộc UI; không thêm human gate mới.
+
+## D018 — Amendment UI mục 28: giữ ba vai trò, bỏ ba cột luôn mở (2026-09-22, T29)
+
+**Nguồn:** `UI_Review.md` mục 5 và `FIX_IMPLEMENTATION_PLAN.md` mục 3.3.
+
+Quyết định: refinement của `novel_ai_spec_v0.2.md` mục 28 —
+
+- giữ **vai trò** Project / Current Workspace / Arbiter và nav workspace ở đỉnh;
+- **bỏ** yêu cầu ba vai trò phải luôn là ba cột lộ thiên: Project vào sidebar trái native
+  (drawer), Arbiter thu gọn kèm badge và mở detail khi cần, workspace nhận chiều rộng được
+  giải phóng;
+- Current Workspace là vùng ưu tiên; mọi action LLM có trạng thái quan sát được;
+- recovery / read-only / blocking stale **vẫn phải hiện ở main khi panel đóng** — không được
+  giấu vì tiện bố cục;
+- **không** dùng expander lồng nhau ở project tree **hoặc** editor (BUG-001); ví dụ “expander
+  lồng” trong `docs/UI_fix/UI_FIX_03_SCHEMA_AWARE_EDITOR.md` không dùng cho bản dependency
+  hiện tại — dùng tab/select/card;
+- toggle/rerun không làm mất working input chưa Save.
+
+Invariant backend (draft không phải canon, validate trước Accept, accepted revision không bị
+silent overwrite, partial không mở Review/Finalize, rerun thuần không gọi API/ghi file) giữ
+nguyên; D018 chỉ đổi bố cục/hiển thị. T32 thực thi, T40 nghiệm thu visual.
+
+## D019 — Event generation dùng chung và editor working copy (2026-09-22, T29)
+
+**Nguồn:** `UI_Review.md` UI-02/UI-03, `docs/UI_fix/UI_FIX_02_CENTRAL_API_STREAM.md`,
+`FIX_IMPLEMENTATION_PLAN.md` mục 3.4–3.5.
+
+Quyết định:
+
+1. Một event contract thuần Python dùng chung cho mọi generation (chi tiết field và state ở
+   `schemas.md` mục 11.1). Service/adapter phát event; **không** module nào trong `core/`,
+   `services/` import Streamlit. UI render bằng primitive Streamlit.
+2. Phân biệt rõ ba mốc: `transport_complete` (đã nhận xong response), `validated` (parse +
+   validate xong), `saved` (candidate/draft đã ghi). UI chỉ được báo “candidate ready” ở mốc
+   `saved`; `completed` không được báo sớm hơn.
+3. Structured JSON đang stream chỉ là raw preview. Partial, timeout, `finish_reason` cắt, hoặc
+   schema sai ⇒ **không** tạo candidate complete, **không** auto accept, **không** mở
+   Review/Finalize; accepted/candidate cũ giữ nguyên. Raw/partial/error lưu qua storage contract
+   (`storage.md` mục 11) và **không** log API key/full prompt/context secret.
+4. Không giả token stream. Provider không hỗ trợ streaming cho structured output ⇒ chọn đường
+   non-streaming rõ từ capability/config và UI ghi rõ “non-streaming”. Không tự gửi request
+   fallback thứ hai sau khi đã nhận partial rồi lỗi.
+5. Retry là action tường minh của user, dùng lại `operation_id` tất định theo storage hiện có
+   (`storage.md` mục 4); replay một operation đã thành công **không** gọi/merge trùng. Không hứa
+   at-most-once từ provider khi crash sau khi gửi request nhưng trước khi nhận phản hồi.
+6. Transcript/view state sống qua rerun trong phiên nhưng **scope theo project + workspace +
+   artifact/revision** — không dùng chung cache transcript giữa project/workspace. Writer
+   transcript/editor **không** nhận full author truth.
+7. Editor chỉ thao tác **working copy** (session-scoped theo project/artifact/revision). Save
+   gọi service edit-candidate; **không** ghi accepted trực tiếp, không lưu theo từng keystroke.
+   Save thủ công **không** tự Accept dù `auto_accept_structured` bật. Output AI đã auto-accept
+   thì view phải ghi trạng thái **accepted** và cho action Revise tường minh, không giả candidate
+   chờ Accept.
+8. Stable ID, status, revision, dependency pin và horizon metadata do app sở hữu. Add/remove/
+   reorder trong working copy đi qua ID allocator + scope/FK/freshness guard. Working copy stale
+   (revision/pin đã đổi) **không** được overwrite revision mới; roundtrip giữ field optional/
+   nested không có widget.
+
+Hệ quả: T33 dựng event/helper dùng chung + tích hợp Writer; T34/T35 nối streaming cho planning
+và chapter; T36 thêm service edit candidate Long/Short Plan; T37–T39 dựng editor theo schema.
+Không thêm queue/worker/concurrent generation.
+

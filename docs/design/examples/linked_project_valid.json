@@ -6,6 +6,8 @@
     "project_id": "proj_0001",
     "title": "Nồi Canh Bên Đường",
     "default_language": "vi",
+    "default_pov": "ngôi ba giới hạn theo Sở Dương",
+    "default_length_guidance": "1500–2000 từ",
     "genre_prompt_id": "xianxia",
     "writing_style_id": "default",
     "current_chapter": 2,

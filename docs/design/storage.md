@@ -1,6 +1,6 @@
 # Storage, transaction và recovery contract
 
-Phiên bản: 2026-09-19. Phụ thuộc: `workflow.md`, `schemas.md`.
+Phiên bản: 2026-09-22 (T29 bổ sung mục 13). Phụ thuộc: `workflow.md`, `schemas.md`.
 
 Mục tiêu của storage MVP là rõ, đọc được bằng mắt, recover được sau lỗi, và không cần database. Mọi đường dẫn trong project đều tương đối từ project root; không phụ thuộc current working directory.
 
@@ -285,3 +285,33 @@ Markdown files chỉ chứa prose/base idea. Metadata nằm ở:
 - Artifact envelopes trỏ `markdown_ref`
 
 Không dùng YAML front matter cho lifecycle trong MVP để tránh parse hai nguồn truth.
+
+## 13. `planning_scope` và migration legacy (T29, 2026-09-22)
+
+Thuộc D017; hình dạng field ở `schemas.md` mục 1.3/3.3/3.4. Không đổi layout file: scope nằm
+trong envelope artifact `plans/long_plan.json` ở `accepted_revision.planning_scope` và
+`candidate_revision.planning_scope` (cùng chỗ với `revision`, `payload`, `dependency_pins`).
+D019 dùng lại nguyên contract operation/retry ở mục 4 cho mọi lần retry generation: cùng
+`operation_id` ⇒ replay không gọi/merge trùng; phần partial/error lưu theo mục 11.
+
+Luật storage:
+
+1. `planning_scope` là metadata app-owned: service ghi khi tạo candidate; Accept **copy nguyên**
+   giá trị từ candidate sang accepted revision. Không có đường nào để payload LLM hay form ghi
+   field này.
+2. Snapshot trước khi thay accepted revision giữ theo mục 3/9 (`history/op_<id>/before/`), nên
+   horizon cũ luôn truy được cùng revision cũ.
+3. Candidate mất scope (file cũ hoặc bị sửa tay) ⇒ Accept từ chối `missing_planning_scope`;
+   accepted cũ không đổi. Không suy scope từ `volumes`/`arcs`.
+4. Action xác nhận horizon cho accepted revision legacy là một write action first-class:
+   `operation_type = confirm_planning_scope`, `operation_id` tất định theo
+   `(artifact_id, revision, start, end)`. Chạy lại cùng input khi đã có scope ⇒ no-op (không
+   snapshot mới, không tăng revision). Đây là **cách duy nhất** để migration chạy; mở project
+   chỉ đọc.
+5. Migration không sửa `volumes`/`arcs`, `short_plan.json`, `chapter.json`, manuscript hay
+   timeline/relationship. Nếu user xác nhận scope không khớp coverage hiện có ⇒ từ chối và giữ
+   nguyên accepted.
+6. Raw output của lần generate dùng horizon nào vẫn trỏ qua `payload_source.raw_output_ref`;
+   không log `planning_scope` như secret (đây không phải secret, nhưng cũng không ghi full
+   prompt/context vào log).
+

@@ -19,9 +19,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from novel_ai.core.llm import StreamChunk
+from novel_ai.core.generation import GenerationTranscript
 from novel_ai.services import ServiceError, writer
-from novel_ai.ui import page_header, set_action_result, show_action_result
+from novel_ai.ui import generation, page_header, set_action_result, show_action_result
 from novel_ai.ui.layout import AppContext
 
 from . import _chapter_ui, _common
@@ -55,9 +55,6 @@ KEY_RELOAD_PROSE = "novel_ai_writer_reload_prose"
 KEY_DISCARD_REVISION = "novel_ai_writer_discard_revision"
 KEY_DISCARD = "novel_ai_writer_discard"
 
-#: Số ký tự prose hiển thị trong khung tiến độ stream.
-PROGRESS_TAIL_CHARS = 1_200
-
 
 def render(ctx: AppContext) -> None:
     import streamlit as st
@@ -82,9 +79,25 @@ def render(ctx: AppContext) -> None:
     if chapter_id is None:  # pragma: no cover
         return
 
+    # Generation surface ở đầu workspace (T33, UI-02): đọc transcript đã scope theo
+    # project/workspace/artifact; nếu chưa có thì hiển thị thông tin phục hồi từ disk.
+    scoped = generation.scope_key(
+        project_id=project.config.project_id, workspace="writer", artifact_id=chapter_id
+    )
+    transcript = generation.load_transcript(scoped)
+    surface = generation.start_surface(
+        scoped,
+        transcript=transcript,
+        project=project,
+        chapter_id=chapter_id,
+        # Writer là surface mà operation gần nhất trên disk đúng là của nó, nên
+        # thông tin phục hồi từ disk thuộc cùng action.
+        disk_recovery=True,
+    )
+
     _render_gate_panel(project, chapter_id)
     _render_draft_panel(ctx, chapter_id)
-    _render_run_panel(ctx, chapter_id)
+    _render_run_panel(ctx, chapter_id, surface=surface, transcript=transcript)
     _render_save_panel(project, chapter_id)
     _render_discard_panel(project, chapter_id)
 
@@ -163,7 +176,13 @@ def _render_draft_panel(ctx: AppContext, chapter_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _render_run_panel(ctx: AppContext, chapter_id: str) -> None:
+def _render_run_panel(
+    ctx: AppContext,
+    chapter_id: str,
+    *,
+    surface: generation.GenerationSurface,
+    transcript: GenerationTranscript | None,
+) -> None:
     import streamlit as st
 
     project = ctx.project
@@ -204,22 +223,28 @@ def _render_run_panel(ctx: AppContext, chapter_id: str) -> None:
 
     intent = (chapter_id, str(action), str(instruction or "").strip(), bool(stream), int(attempt))
     operation_id = _chapter_ui.stable_operation_id("writer", *intent)
-    progress = st.empty()
-    collected: list[str] = []
-
-    def _on_chunk(chunk: StreamChunk) -> None:
-        if chunk.status == "delta":
-            collected.append(chunk.text)
-            progress.code("".join(collected)[-PROGRESS_TAIL_CHARS:])
-        else:
-            collected.clear()
-            progress.caption(f"stream kết thúc với status `{chunk.status}`")
+    # Operation mới ⇒ transcript mới cho scope này. Replay cùng operation_id vẫn
+    # dùng lại transcript cũ (không có request thứ hai).
+    if transcript is None or transcript.operation_id != operation_id:
+        transcript = GenerationTranscript(
+            operation_id=operation_id,
+            action=str(action),
+            attempt=int(attempt),
+            artifact_id=chapter_id,
+            chapter_id=chapter_id,
+            transport="streaming" if stream else "non_streaming",
+            prompt_id=writer.DRAFT_PROMPT_ID,
+        )
+    on_event = generation.make_recorder(
+        surface, transcript, project=project, chapter_id=chapter_id
+    )
 
     kwargs: dict[str, Any] = {
         "client": ctx.llm_client,
         "chapter_id": chapter_id,
         "stream": bool(stream),
-        "on_chunk": _on_chunk if stream else None,
+        "on_event": on_event,
+        "attempt": int(attempt),
         "operation_id": operation_id,
     }
 
@@ -246,9 +271,12 @@ def _render_run_panel(ctx: AppContext, chapter_id: str) -> None:
                 "lỗi provider: draft cũ giữ nguyên, thử lại hoặc Continue sau."
             ),
         )
+        surface.render(transcript, project=project, chapter_id=chapter_id)
         return
     if blocked:
+        surface.render(transcript, project=project, chapter_id=chapter_id)
         return
+    surface.render(transcript, project=project, chapter_id=chapter_id)
     set_action_result(result)
     st.rerun()
 
@@ -275,12 +303,15 @@ def _render_save_panel(project: Any, chapter_id: str) -> None:
     if st.button("Nạp lại editor từ prose hiện tại", key=KEY_RELOAD_PROSE):
         _common.clear_session_keys(key, f"{key}__source")
         st.rerun()
-    current = _common.sync_text_editor(key, text, version=version)
-    edited = st.text_area(
-        "Prose (markdown). Save tạo prose revision **mới** và làm Human Review cũ mất hiệu lực.",
-        value=current,
-        height=320,
-        key=key,
+    st.caption(
+        f"Prose revision hiện tại: **r{draft.revision}** · "
+        f"{'complete' if draft.is_complete else 'partial'} · source `{draft.source_type.value}`."
+    )
+    edited = _common.render_prose_editor(
+        key,
+        text,
+        version=version,
+        label="Prose (markdown). Save tạo prose revision **mới** và làm Human Review cũ mất hiệu lực.",
     )
     st.caption(
         "Save Draft tạo revision mới thay vì sửa revision cũ: accepted/final không bị "

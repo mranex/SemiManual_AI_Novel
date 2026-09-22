@@ -73,7 +73,11 @@ __all__ = [
     "format_id",
     "format_id_list",
     "parse_json_payload",
+    "payload_fingerprint",
     "payload_json_text",
+    "prose_editor_metrics",
+    "render_prose_editor",
+    "selector_options",
     "render_error_list",
     "render_service_error",
     "selected_revision_text",
@@ -197,6 +201,23 @@ def compact_json(value: Any) -> str:
     return json.dumps(data, ensure_ascii=False, sort_keys=True)
 
 
+def payload_fingerprint(payload: Any) -> str:
+    """Hash ngắn của payload để editor biết khi nào cần nạp lại từ candidate.
+
+    Dùng cho `sync_text_editor(version=...)`: revision đổi **hoặc** nội dung payload
+    đổi thì editor raw mới được nạp lại, còn rerun/submit lỗi thì giữ nguyên text
+    user đang sửa.
+    """
+    import hashlib
+
+    data = payload.model_dump(mode="json") if hasattr(payload, "model_dump") else payload
+    try:
+        text = json.dumps(data, ensure_ascii=False, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        text = repr(data)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+
+
 def parse_json_payload(text: str) -> tuple[Any | None, str | None]:
     """Parse text editor thành object; trả `(object, lỗi)` chứ không raise vào UI.
 
@@ -235,6 +256,24 @@ def clear_session_keys(*keys: str) -> None:
         st.session_state.pop(key, None)
 
 
+def clear_session_keys_with_prefix(prefix: str) -> list[str]:
+    """Xoá mọi session_state key bắt đầu bằng `prefix`; trả danh sách đã xoá.
+
+    Dùng cho editor form nhiều widget (T37): nút "Nạp lại" phải quên hết giá trị
+    đang sửa của form rồi đọc lại candidate. Cùng ràng buộc như
+    `clear_session_keys`: chỉ gọi trước khi widget tương ứng được instantiate
+    trong run hiện tại.
+    """
+    import streamlit as st
+
+    removed = [
+        str(key) for key in list(st.session_state.keys()) if str(key).startswith(prefix)
+    ]
+    for key in removed:
+        st.session_state.pop(key, None)
+    return removed
+
+
 def sync_text_editor(
     key: str,
     text: str,
@@ -257,6 +296,55 @@ def sync_text_editor(
         st.session_state[version_key] = version
         return text
     return str(current)
+
+
+def prose_editor_metrics(text: Any) -> dict[str, int]:
+    """Đếm từ/ký tự của prose đang sửa (hàm thuần, test được)."""
+    raw = "" if text is None else str(text)
+    words = [item for item in raw.split() if item.strip()]
+    return {"words": len(words), "characters": len(raw)}
+
+
+def render_prose_editor(
+    key: str,
+    text: str,
+    *,
+    version: Any,
+    label: str,
+    height: int = 480,
+) -> str:
+    """Editor prose **Edit | Preview** full-width, trả nội dung đang sửa.
+
+    - Preview render markdown của chính nội dung đang sửa và **không** ghi file,
+      không tạo revision, không gọi LLM (UI-03: "preview không mutate").
+    - Nội dung đang sửa nằm trong `st.session_state[key]` qua `sync_text_editor`, nên
+      đổi tab/rerun/submit lỗi không làm mất input.
+    - Đếm từ/ký tự hiển thị cạnh editor; revision cụ thể do page caption.
+    """
+    import streamlit as st
+
+    edit_tab, preview_tab = st.tabs(["Edit", "Preview"])
+    with edit_tab:
+        # `sync_text_editor` đã bảo đảm `session_state[key]` tồn tại, nên widget
+        # **không** truyền `value=`: Streamlit coi "default + value set qua Session
+        # State API" là xung đột và hiện cảnh báo vàng (phát hiện ở kiểm visual T40).
+        sync_text_editor(key, text, version=version)
+        edited = st.text_area(label, height=height, key=key)
+    with preview_tab:
+        st.caption(
+            "Preview chỉ hiển thị nội dung bạn đang sửa: **không** ghi file, không tạo "
+            "revision, không gọi LLM. Bấm Save mới là action ghi state."
+        )
+        if str(edited or "").strip():
+            st.markdown(edited)
+        else:
+            st.caption("(nội dung đang trống)")
+    metrics = prose_editor_metrics(edited)
+    st.caption(
+        f"{metrics['words']} từ · {metrics['characters']} ký tự · "
+        f"{'có thay đổi chưa Save so với revision hiện tại' if str(edited) != str(text) else 'chưa có thay đổi so với revision hiện tại'}"
+    )
+    return str(edited)
 
 
 def candidate_update_hint_for_envelope(
@@ -412,6 +500,30 @@ def build_id_index(project: Project) -> dict[str, str]:
         for item in getattr(foreshadows.accepted_revision.payload, "foreshadows", []) or []:
             index[item.foreshadow_id] = item.label
     return index
+
+
+#: Tên field selector → prefix stable ID hợp lệ trong accepted index.
+SELECTOR_PREFIXES: dict[str, str] = {
+    "character_ids": "char",
+    "world_rule_ids": "rule",
+    "foreshadow_ids": "fs",
+}
+
+
+def selector_options(project: Project) -> dict[str, list[str]]:
+    """`{field_name: [ID đúng loại]}` cho `editor.render_model_form(selectors=...)`.
+
+    Selector chỉ được chứa ID **đúng loại** (T39): trước đây page truyền cả index
+    trộn nên user có thể chọn `rule_0001` cho `character_ids` rồi bị validator từ
+    chối. Danh sách vẫn lấy từ accepted foundation, không từ candidate.
+    """
+    index = build_id_index(project)
+    options: dict[str, list[str]] = {}
+    for field, prefix in SELECTOR_PREFIXES.items():
+        options[field] = sorted(
+            entity_id for entity_id in index if str(entity_id).startswith(f"{prefix}_")
+        )
+    return options
 
 
 def format_id(entity_id: str, index: Mapping[str, str] | None = None) -> str:

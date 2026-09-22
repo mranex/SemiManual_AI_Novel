@@ -506,3 +506,148 @@ def test_repeated_reconcile_generate_is_idempotent_at_ui_level(
     assert artifact.candidate_revision.revision == revision_after_first
     assert fingerprint_tree(project.root) == after_first
     assert "bỏ qua" in rendered(at)
+
+
+# ---------------------------------------------------------------------------
+# 7. T33 — generation surface dùng chung
+# ---------------------------------------------------------------------------
+
+
+def _writer_transcript(at: Any, project: Any) -> dict[str, Any]:
+    from novel_ai.ui import generation
+
+    scoped = generation.scope_key(
+        project_id=project.config.project_id, workspace="writer", artifact_id="ch_0001"
+    )
+    store = at.session_state[generation.KEY_TRANSCRIPT]
+    return dict(store[scoped])
+
+
+def test_generation_surface_keeps_completed_transcript_after_rerun(
+    apptest_factory: Any, tmp_path: Path, t02_valid_document: dict[str, Any]
+) -> None:
+    """Complete: surface ghi `saved`, transcript còn sau rerun, không thêm LLM call."""
+    project = seed_chapter_project(tmp_path, t02_valid_document, chapters=2)
+    at = apptest_factory(project, "writer", responses=[COMPLETE_PROSE])
+    assert not at.exception
+    # Ép nhánh non-streaming để kiểm cả provider không stream.
+    at.checkbox(key=writer_page.KEY_STREAM).set_value(False)
+    at.run(timeout=180)
+
+    click(at, writer_page.KEY_RUN)
+
+    assert not at.exception
+    assert len(client_of(at).calls) == 1
+    text = rendered(at)
+    assert "đã validate và lưu" in text
+    # Provider không stream: surface ghi rõ transport, không có raw preview delta nào.
+    assert "transport `non_streaming`" in text
+    assert "Raw preview" not in text
+    transcript = _writer_transcript(at, project)
+    assert transcript["state"] == "saved"
+    assert transcript["transport"] == "non_streaming"
+    assert [event["status"] for event in transcript["events"]] == [
+        "connecting",
+        "non_streaming",
+        "transport_complete",
+        "validating",
+        "saved",
+    ]
+
+    # Rerun thuần: transcript vẫn hiển thị, không gọi API, không tạo revision mới.
+    revision = storage.load_chapter(project, "ch_0001").current_draft_revision
+    at.run(timeout=180)
+    at.run(timeout=180)
+
+    assert not at.exception
+    assert "đã validate và lưu" in rendered(at)
+    assert len(client_of(at).calls) == 1
+    assert storage.load_chapter(project, "ch_0001").current_draft_revision == revision
+
+
+def test_generation_surface_shows_streamed_deltas_in_order(
+    apptest_factory: Any, tmp_path: Path, t02_valid_document: dict[str, Any]
+) -> None:
+    """Stream thật: delta hiện dần và state cuối là `saved` cho bản complete."""
+    project = seed_chapter_project(tmp_path, t02_valid_document, chapters=2)
+    at = apptest_factory(
+        project, "writer", stream=["Sở Dương ", "mở mắt.", ""]
+    )
+    assert not at.exception
+
+    click(at, writer_page.KEY_RUN)
+
+    assert not at.exception
+    transcript = _writer_transcript(at, project)
+    assert transcript["transport"] == "streaming"
+    assert transcript["state"] == "saved"
+    assert transcript["text"] == "Sở Dương mở mắt."
+    statuses = [event["status"] for event in transcript["events"]]
+    assert statuses[:3] == ["connecting", "streaming", "streaming"]
+    assert statuses[-1] == "saved"
+    assert "Sở Dương mở mắt." in rendered(at)
+    assert storage.load_chapter(project, "ch_0001").current_draft.is_complete is True
+
+
+def test_generation_surface_shows_partial_not_complete_and_recovers_from_disk(
+    apptest_factory: Any, tmp_path: Path, t02_valid_document: dict[str, Any]
+) -> None:
+    """Partial: không hiển thị như complete; mở lại app đọc thông tin phục hồi từ disk."""
+    project = seed_chapter_project(tmp_path, t02_valid_document, chapters=2)
+    at = apptest_factory(project, "writer", stream=["Mở đầu", "interrupted"])
+    assert not at.exception
+
+    click(at, writer_page.KEY_RUN)
+
+    assert not at.exception
+    transcript = _writer_transcript(at, project)
+    assert transcript["state"] == "partial"
+    assert transcript["raw_ref"]
+    text = rendered(at)
+    assert "partial — chưa dùng được" in text
+    assert "không" in text and "auto accept" in text
+
+    # Rerun: vẫn là partial, không tự thành saved/candidate.
+    at.run(timeout=180)
+    assert "partial — chưa dùng được" in rendered(at)
+    assert _writer_transcript(at, project)["state"] == "partial"
+
+    # Session mới (mở lại app): transcript không còn, surface đọc disk và nói thật
+    # run gần nhất là partial + raw ref để phục hồi.
+    at2 = apptest_factory(project, "writer")
+    assert not at2.exception
+    reopened = rendered(at2)
+    assert "Chưa có generation nào trong phiên này" in reopened
+    assert "Run gần nhất trên disk" in reopened
+    assert "complete `False`" in reopened
+    assert "Raw/partial output để phục hồi" in reopened
+    assert client_of(at2).calls == []
+
+
+def test_generation_surface_is_scoped_per_workspace(
+    apptest_factory: Any, tmp_path: Path, t02_valid_document: dict[str, Any]
+) -> None:
+    """Transcript của Writer không rò sang workspace khác."""
+    project = seed_chapter_project(tmp_path, t02_valid_document, chapters=2)
+    at = apptest_factory(project, "writer", responses=[COMPLETE_PROSE])
+    click(at, writer_page.KEY_RUN)
+    assert not at.exception
+
+    from novel_ai.ui import generation
+
+    store = at.session_state[generation.KEY_TRANSCRIPT]
+    assert any(key.startswith(f"{project.config.project_id}|writer|") for key in store)
+    assert not any(key.startswith(f"{project.config.project_id}|review|") for key in store)
+
+    # Harness render một workspace, nên kiểm scope bằng AppTest cho workspace Review:
+    # transcript Writer không được hiển thị như generation của workspace khác.
+    review = apptest_factory(project, "review")
+    assert not review.exception
+    review_text = rendered(review)
+    assert "Raw preview" not in review_text
+    assert "op `op_ui_" not in review_text
+    assert generation.load_transcript(
+        generation.scope_key(
+            project_id=project.config.project_id, workspace="review", artifact_id="ch_0001"
+        )
+    ) is None

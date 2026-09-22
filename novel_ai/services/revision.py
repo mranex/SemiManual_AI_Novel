@@ -55,6 +55,7 @@ from novel_ai.core.models import (
     now_iso,
 )
 from novel_ai.core.prompts import PromptRegistry, render_prompt
+from novel_ai.core.generation import EventSink, GenerationEmitter
 from novel_ai.core.project import Project
 from novel_ai.services import (
     ActionResult,
@@ -64,12 +65,14 @@ from novel_ai.services import (
     StaleDependencyError,
     ValidationFailure,
 )
+from novel_ai.services.co_create import transport_complete_seam
 from novel_ai.services import reconcile as reconcile_service
 
 __all__ = [
     "IMPACT_PROMPT_ID",
     "RETCON_MARKER_NAME",
     "downstream_blockers",
+    "downstream_proposal_operation_id",
     "generate_impact_report",
     "mark_downstream_stale",
     "reaccept_stale",
@@ -115,6 +118,15 @@ def _abort_quietly(handle: storage.OperationHandle) -> None:
 
 def _suffix(operation_id: str, suffix: str) -> str:
     return f"{operation_id}.{suffix}"
+
+
+def downstream_proposal_operation_id(operation_id: str) -> str:
+    """`operation_id` của lượt generate proposal bên trong `reconcile_downstream`.
+
+    Export để UI dựng generation surface/recorder cùng một operation id với
+    `GenerationEmitter` (T40/UI-02) thay vì tự đoán quy ước hậu tố.
+    """
+    return _suffix(operation_id, "proposal")
 
 
 def _chapter_or_fail(project: Project, chapter_id: str) -> ChapterMetadata:
@@ -595,6 +607,9 @@ def generate_impact_report(
     analysis_scope: str = "",
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Sinh `retcon_impact.v1` và lưu candidate `impact_report_<item_id>` (`draft`).
 
@@ -645,17 +660,38 @@ def generate_impact_report(
         prompt_version=rendered.prompt_version,
         prompt_hash=rendered.template_hash,
     )
-    try:
-        parsed, raw_text, error = generate_structured(client, request, ImpactReportPayload)
-    except LLMError as exc:
-        raise LLMUnavailableError(
-            f"Gọi LLM cho impact report thất bại: {exc}",
-            code=getattr(exc, "code", "llm_unavailable"),
-            details={"item_id": change.item_id, "operation_id": op_id},
-        ) from exc
-
     artifact_id = _impact_artifact_id(change)
-    raw_ref = _raw_output_for(
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action="revision.impact_report",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=IMPACT_PROMPT_ID,
+            artifact_id=artifact_id,
+        )
+        if on_event is not None
+        else None
+    )
+    complete, holder = transport_complete_seam(
+        project,
+        client=client,
+        operation_id=op_id,
+        label=f"impact_{change.item_id}",
+        emitter=emitter,
+        stream=stream,
+        now=now,
+        prompt_id=IMPACT_PROMPT_ID,
+    )
+    # `generate_structured` phát transport (qua seam) rồi parse; bước `validating`
+    # chỉ bắt đầu sau khi transport xong.
+    parsed, raw_text, error = generate_structured(
+        client, request, ImpactReportPayload, complete=complete
+    )
+    if emitter is not None:
+        emitter.validating(detail="Đang parse/validate impact report.")
+
+    raw_ref = holder.get("raw_ref") or _raw_output_for(
         project, operation_id=op_id, text=raw_text, label=f"impact_{change.item_id}"
     )
     if parsed is None or error is not None:
@@ -676,6 +712,14 @@ def generate_impact_report(
             error=record,
             operation_id=op_id,
         )
+        if emitter is not None:
+            emitter.invalid(
+                detail=(
+                    "Impact report không hợp lệ: raw được giữ, không mutation nào "
+                    "được thực hiện."
+                ),
+                raw_ref=raw_ref,
+            )
         return ActionResult(
             operation_id=op_id,
             artifact_id=artifact_id,
@@ -713,6 +757,11 @@ def generate_impact_report(
             error=record,
             operation_id=op_id,
         )
+        if emitter is not None:
+            emitter.invalid(
+                detail="Impact report sai contract: raw được giữ, không mutation nào được thực hiện.",
+                raw_ref=raw_ref,
+            )
         return ActionResult(
             operation_id=op_id,
             artifact_id=artifact_id,
@@ -743,6 +792,14 @@ def generate_impact_report(
         now=now,
     )
     storage.save_artifact(project, candidate, operation_id=_suffix(op_id, "impact"))
+    if emitter is not None:
+        emitter.saved(
+            detail=(
+                "Impact report đã validate và lưu candidate `draft`; report không tự apply "
+                "và không tự đánh dấu stale."
+            ),
+            raw_ref=raw_ref,
+        )
     return ActionResult(
         operation_id=op_id,
         artifact_id=artifact_id,
@@ -1169,6 +1226,9 @@ def reconcile_downstream(
     chapter_id: str,
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Rebuild/reconcile một chương downstream theo state as-of chương trước.
 
@@ -1177,6 +1237,11 @@ def reconcile_downstream(
     `refresh_state=True` nên proposal mới được commit thay entry timeline/
     relationship của chính chương đó (không nhân đôi) và `latest_consistent_chapter`
     tiến lên theo thứ tự.
+
+    ``on_event``/``stream``/``attempt`` (T40) đi thẳng vào
+    `reconcile.generate_reconciliation`: đây cũng là một action gọi LLM nên UI phải
+    có cùng generation surface như workspace Reconcile (UI-02), không chặn cứng
+    trang khi provider chậm.
     """
     chapter = _chapter_or_fail(project, chapter_id)
     if chapter.final_revision is None:
@@ -1206,6 +1271,9 @@ def reconcile_downstream(
         operation_id=_suffix(op_id, "proposal"),
         now=now,
         _refresh=True,
+        on_event=on_event,
+        stream=stream,
+        attempt=attempt,
     )
     if proposal_result.data.get("reconciliation_status") == "failed":
         return ActionResult(

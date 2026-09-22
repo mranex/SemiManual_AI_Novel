@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -174,6 +174,33 @@ class AppConfig:
         return messages
 
 
+def _dotenv_path(root: Path) -> Path:
+    """File dotenv đọc khi `load_config(env=None)`; mặc định là `<root>/.env`.
+
+    Tách thành một hàm nhỏ để test cô lập được dotenv của máy (T26): suite test
+    monkeypatch seam này về thư mục tạm nên `.env` thật ở repo root không bao giờ
+    ảnh hưởng kết quả. App chạy thật không đổi hành vi.
+    """
+    return root / ".env"
+
+
+def _load_env_sources(root: Path, environ: Mapping[str, str]) -> Mapping[str, str]:
+    """Ghép `.env` ở repo root với biến môi trường thật; biến thật luôn thắng.
+
+    Đọc `.env` bằng `dotenv_values` (không mutate `os.environ`). Nhờ vậy gọi
+    `load_config()` không làm rò cấu hình provider (key thật, base URL) vào
+    process: test khác hay code khác đọc `os.environ` vẫn thấy môi trường sạch.
+    `override=False` của `load_dotenv` trước đây ghi thẳng vào `os.environ` nên
+    biến từ `.env` sống sót qua cả `monkeypatch.delenv`.
+    """
+    file_values = dotenv_values(_dotenv_path(root))
+    merged: dict[str, str] = {
+        str(name): str(value) for name, value in file_values.items() if value is not None
+    }
+    merged.update({str(name): str(value) for name, value in environ.items()})
+    return merged
+
+
 def load_config(
     env: Mapping[str, str] | None = None,
     *,
@@ -181,15 +208,15 @@ def load_config(
 ) -> AppConfig:
     """Đọc app config.
 
-    `env=None` (mặc định khi chạy app): nạp `.env` ở repo root với `override=False`
-    rồi đọc `os.environ`, nên biến môi trường thật luôn thắng file `.env`.
+    `env=None` (mặc định khi chạy app): ghép `.env` ở repo root với `os.environ`,
+    trong đó biến môi trường thật luôn thắng file `.env`. Việc đọc `.env` **không**
+    sửa `os.environ`.
     Truyền `env={...}` để test độc lập hoàn toàn với môi trường và `.env`.
     """
     root = (Path(repo_root) if repo_root is not None else REPO_ROOT).resolve()
 
     if env is None:
-        load_dotenv(root / ".env", override=False)
-        source: Mapping[str, str] = os.environ
+        source: Mapping[str, str] = _load_env_sources(root, os.environ)
     else:
         source = env
 

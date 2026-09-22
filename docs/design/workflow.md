@@ -1,6 +1,6 @@
 # Workflow và authority contract
 
-Phiên bản: 2026-09-19. Nguồn sản phẩm: `novel_ai_spec_v0.2.md`.
+Phiên bản: 2026-09-22 (T29 bổ sung mục 5.6 và invariant 33–40). Nguồn sản phẩm: `novel_ai_spec_v0.2.md`.
 
 Tài liệu này chốt hành vi workflow ở mức contract để T02+ có thể thiết kế schema, storage, service và UI mà không tự diễn giải lại luật sản phẩm.
 
@@ -119,14 +119,27 @@ Trong `finalizing`, final candidate được hiển thị như bản chờ commi
 
 | Action | Actor | Precondition | Output | Success transition | Reject/Retry/Cancel |
 |---|---|---|---|---|---|
-| Generate/Regenerate Long Plan | User -> Backend -> LLM | Base Idea + Premise accepted; relevant Architect foundation accepted; dependencies not stale | Long Plan candidate | `draft`, then `accepted` on accept | Reject keeps old plan. Retry creates new candidate. |
-| Accept Long Plan | User hoặc auto-accept structured hợp lệ | Candidate valid; references resolve; within Premise/Base Idea authority | Accepted Long Plan | Short Plan can be generated | Reject/cancel keeps previous accepted. |
-| Generate/Regenerate Short Plan | User -> Backend -> LLM | Long Plan accepted; selected arc exists; context dependencies fresh | Short Plan candidate | `draft`, then `accepted` on accept | Same structured lifecycle. |
+| Generate/Regenerate Long Plan | User -> Backend -> LLM | Base Idea + Premise accepted; relevant Architect foundation accepted; dependencies not stale; **`planning_scope` do user chọn rõ** (D017) | Long Plan candidate + `planning_scope` ghi trên revision | `draft`, then `accepted` on accept | Reject keeps old plan. Retry creates new candidate. Thiếu scope ⇒ `missing_planning_scope`, zero LLM call. |
+| Accept Long Plan | User hoặc auto-accept structured hợp lệ | Candidate valid; references resolve; within Premise/Base Idea authority; **coverage đúng `planning_scope` của candidate** (D017) | Accepted Long Plan (giữ nguyên `planning_scope`) | Short Plan can be generated | Reject/cancel keeps previous accepted. Candidate thiếu scope ⇒ từ chối, không revalidate bằng `scope=None`. |
+| Confirm horizon cho Long Plan legacy | User -> Backend | Accepted revision `planning_scope == null`; user nhập `{start, end}` | Accepted revision có `planning_scope` (snapshot trước) | Generate/regenerate/accept chạy lại được | Scope không khớp coverage hiện có ⇒ từ chối, accepted giữ nguyên. Không auto chạy khi mở project. |
+| Generate/Regenerate Short Plan | User -> Backend -> LLM | Long Plan accepted; selected arc exists; context dependencies fresh; **đủ `{language, pov, length_guidance}` cho mọi assigned chapter** (D016) | Short Plan candidate | `draft`, then `accepted` on accept | Same structured lifecycle. Thiếu/thừa/trùng constraint ⇒ `GuardError` trước LLM, zero call. |
 | Accept Short Plan | User hoặc auto-accept structured hợp lệ | Candidate valid; chapter IDs stable; referenced entity IDs allowed for chapter range | Accepted Short Plan | Skeleton for planned chapters unlocks | Reject/cancel keeps old. |
 | Rolling Plan Review | User -> Backend -> LLM | Short Plan accepted; current timeline/relationship available; rolling reminder due or user manual trigger | Rolling Plan proposal | `draft` proposal | Reject means no plan mutation. Retry allowed. |
 | Apply Rolling Plan | User hoặc auto-accept structured hợp lệ | Proposal valid; only future Short Plan/relationship direction changes; does not conflict with Long Plan | Updated future plan candidate or accepted patch | Future planning updated; affected future skeletons stale | Reject/cancel keeps current accepted plan. |
 
 Rolling Plan cannot edit Base Idea, Premise, Long Plan, Final Manuscript or past/current accepted state. If proposal needs those changes, it must report an issue for user decision, not apply.
+
+**Bổ sung T29 (2026-09-22).** `planning_scope` là horizon cấp truyện, không phải arc size hay edit
+window (D017; shape và coverage invariant ở `schemas.md` mục 3.1/3.3/3.4). Hệ quả trực tiếp:
+
+- Generate/regenerate/edit trả **full payload của horizon**; giữ entity không đổi theo stable ID.
+  Không có vùng "ngoài scope cần giữ" để merge.
+- Accept/reload revalidate bằng chính `planning_scope` đã lưu trên revision; không suy lại từ
+  `current_chapter`, Short Plan hay chapter metadata.
+- Số volume/arc không có quota. Một arc phủ đúng horizon hợp lệ về cấu trúc; UI chỉ hiện warning
+  non-blocking và **không** đổi Auto Accept.
+- Collapse horizon lớn vào một arc **không** còn tự động hợp lệ: nếu arc đó không phủ đầu/cuối
+  hoặc tạo gap/overlap thì bị từ chối; nếu nó phủ đúng horizon thì qua validator nhưng bị warning.
 
 ### 4.3. Skeleton và Writer
 
@@ -213,6 +226,32 @@ Arbiter may suggest Rolling Plan when `rolling_plan_every` says it is due, when 
 - Interrupted writer stream may be stored as partial draft. It cannot become `review_required`, final, or canon until user completes/accepts the draft path.
 - Retry must be idempotent where prior attempt reached `finalizing` or transaction recovery.
 
+**Bổ sung T29 (2026-09-22), thuộc D019 và `schemas.md` mục 11.** Với mọi generation:
+
+- State machine chung: `idle → connecting → (streaming | non_streaming) → transport_complete →
+  validating → saved`, cùng các terminal `partial | invalid | error`. Chỉ `saved` được báo
+  "candidate ready" và mở Accept/Review/Finalize; `transport_complete` không phải hoàn tất.
+- Structured JSON đang stream chỉ là raw preview. Partial, timeout, `finish_reason` cắt hoặc
+  schema sai ⇒ không tạo candidate complete, không auto accept, không mở Review/Finalize; raw/
+  partial/error lưu theo `storage.md` mục 11; accepted/candidate cũ giữ nguyên.
+- Không giả token stream. Provider không hỗ trợ streaming ⇒ nhánh `non_streaming` hiển thị rõ.
+- Sau `partial` **không** tự gửi request fallback thứ hai; retry là action explicit của user và
+  dùng lại `operation_id` (replay operation đã `saved` không gọi/merge trùng).
+
+### 5.6. Writing contract guard (D016, 2026-09-22)
+
+Trước khi Short Plan gọi LLM, backend kiểm cho **mọi** assigned chapter:
+
+- có đúng một entry `chapter_constraints`, không thiếu, không trùng, không chứa `chapter_id`
+  ngoài assigned scope;
+- `language`, `pov`, `length_guidance` sau khi resolve default project + override chương đều
+  **không rỗng**.
+
+Vi phạm ⇒ `GuardError` với code ổn định và chi tiết `chapter_id`/field; không gọi LLM, không tạo
+raw record, không đổi accepted state. Guard chạy ở service nên caller trực tiếp không bypass
+được UI. Model không được thay contract đã cấp: giá trị khác trong output bị coi invalid
+(`invalid_outline_contract_item`).
+
 ## 6. Manual walkthroughs
 
 ### 6.1. Chapter 1 -> Chapter 2
@@ -290,6 +329,14 @@ Arbiter may suggest Rolling Plan when `rolling_plan_every` says it is due, when 
 | 30 | Không subsystem nào được tự biến thành agent. | No autonomous loop; action-scoped services. | Service tests call one action and assert no chained downstream mutation. |
 | 31 | Không thêm công nghệ nếu rule + JSON giải quyết được. | Architecture review and task scope. | T07 dependency manifest remains Python/Streamlit/Pydantic/pytest unless approved. |
 | 32 | Human là authority cuối cùng. | User accept/finalize/revise actions required. | AI reports/issues do not mutate canon without user/auto-accept where allowed. |
+| 33 | `planning_scope` là complete horizon và không suy từ progress. | D017; `ArtifactRevision.planning_scope`; guard `missing_planning_scope`. | Generate không truyền scope bị từ chối; accepted `1..120` không co còn `1..3` sau reload. |
+| 34 | Arc ranges phủ đúng horizon: không gap/overlap/out-of-scope, đủ hai đầu. | Validator coverage dùng chung cho generate/edit/accept/revalidate. | Candidate `1..20, 22..40` cho scope `1..40` bị từ chối. |
+| 35 | Số volume/arc không có quota; warning one-arc không phải validator. | UI preview non-blocking; Auto Accept theo config. | Plan một arc phủ đúng scope vẫn accept được, chỉ kèm warning. |
+| 36 | Yêu cầu viết `{language, pov, length_guidance}` phải đủ trước khi gọi LLM. | D016; guard `chapter_constraints` trước context/LLM. | Thiếu POV/length ⇒ `GuardError`, `client.calls == []`. |
+| 37 | Default viết theo project không sửa ngược accepted contract. | D016; Save default chỉ ghi `project.json`. | Đổi `default_length_guidance` không đổi Short Plan đã accepted. |
+| 38 | Chỉ `saved` mới là hoàn tất; partial/truncated không tạo candidate. | D019; state machine `schemas.md` mục 11.2. | Stream đứt: raw partial còn, không candidate, Auto Accept không chạy. |
+| 39 | Save thủ công không tự Accept dù `auto_accept_structured = true`. | Service edit-candidate tách khỏi accept. | Save candidate trong editor không đổi `accepted_revision`. |
+| 40 | Không lồng expander ở project tree hoặc editor. | D018; renderer một tầng. | Project có chapter render không `StreamlitAPIException`. |
 
 ## 8. Link nội bộ liên quan
 

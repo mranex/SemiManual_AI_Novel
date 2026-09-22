@@ -60,6 +60,7 @@ __all__ = [
     "load_prompt_registry",
     "main_css",
     "nav_labels",
+    "navigate_to_workspace",
     "probe_llm",
     "render_arbiter_panel",
     "render_recovery_banner",
@@ -93,6 +94,9 @@ KEY_WORKSPACE_NAV = "novel_ai_workspace_nav"
 KEY_TREE_NODE = "novel_ai_tree_node"
 KEY_LLM_STATUS = "novel_ai_llm_status"
 KEY_LLM_MESSAGE = "novel_ai_llm_message"
+#: Trạng thái mở/đóng panel Arbiter (UI working state, không phải state truyện).
+KEY_ARBITER_OPEN = "novel_ai_arbiter_open"
+KEY_ARBITER_TOGGLE = "novel_ai_arbiter_toggle"
 
 #: Workspace id -> module trong `novel_ai.pages`.
 #:
@@ -279,6 +283,23 @@ def label_for_workspace(workspace: str) -> str:
     return dict(project_tree.WORKSPACES).get(workspace, workspace)
 
 
+def navigate_to_workspace(workspace: str) -> None:
+    """Chuyển workspace đang chọn; dùng làm `on_click` callback của nút điều hướng.
+
+    Streamlit chạy callback **trước** khi rerun script, nên gán
+    `KEY_WORKSPACE_NAV` ở đây là hợp lệ. Đây là đường đồng bộ duy nhất (BUG-002):
+    gán widget key sau khi radio đã được instantiate trong cùng run bị Streamlit
+    từ chối bằng `StreamlitAPIException`, và navbar sẽ ghi đè workspace trở lại.
+    Workspace lạ bị bỏ qua thay vì đưa UI vào trạng thái không render được.
+    """
+    import streamlit as st
+
+    if workspace not in WORKSPACE_MODULES:
+        return
+    st.session_state[KEY_WORKSPACE] = workspace
+    st.session_state[KEY_WORKSPACE_NAV] = label_for_workspace(workspace)
+
+
 def workspace_from_label(label: str) -> str:
     """Nhãn nav → workspace id; nhãn lạ trả về workspace đầu tiên."""
     keys = [key for key, _label in project_tree.WORKSPACES]
@@ -299,6 +320,11 @@ def main_css() -> str:
       div[data-testid="stDecoration"] { display: none; }
       div[data-testid="stToolbar"] { display: none; }
       .block-container { padding-top: 1.1rem; padding-bottom: 4.75rem; max-width: 100%; }
+      /* Status bar ghim ở đáy phủ toàn chiều ngang, nên drawer cũng phải chừa chỗ:
+         nếu không, nút cuối drawer (ví dụ "Tạo project") bị che ở màn thấp. */
+      section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+        padding-bottom: 4.75rem;
+      }
       .dsh-shell-footer {
         position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000000;
         background: #f3f4f6; color: #111827;
@@ -322,7 +348,13 @@ def main_css() -> str:
 
 
 def _render_navbar() -> str:
-    """Nav workspace ở đỉnh + lưu lựa chọn vào `KEY_WORKSPACE`."""
+    """Nav workspace ở đỉnh + lưu lựa chọn vào `KEY_WORKSPACE`.
+
+    Không truyền `index` cho radio: `KEY_WORKSPACE_NAV` đã được gán trước đó (state
+    có sẵn, hoặc **callback** `navigate_to_workspace` chạy trước script body). Streamlit
+    coi "widget có default + value set qua Session State API" là xung đột và hiện cảnh
+    báo vàng trên UI (phát hiện ở kiểm visual T40); chỉ gán session value là đủ.
+    """
     import streamlit as st
 
     labels = nav_labels()
@@ -334,7 +366,6 @@ def _render_navbar() -> str:
     chosen = st.radio(
         "Workspace",
         labels,
-        index=labels.index(st.session_state[KEY_WORKSPACE_NAV]),
         key=KEY_WORKSPACE_NAV,
         horizontal=True,
         label_visibility="collapsed",
@@ -344,18 +375,6 @@ def _render_navbar() -> str:
     # Page đọc `st.session_state["novel_ai_workspace"]` qua `ui.current_workspace()`
     # để scope kết quả action; phải gán trước khi `render_workspace` chạy.
     return workspace
-
-
-def _render_project_pane(project: Project | None) -> None:
-    """Pane trái: PROJECT — cây artifact/chapter + kết nối LLM."""
-    import streamlit as st
-
-    st.markdown('<div class="dsh-pane-title">Project</div>', unsafe_allow_html=True)
-    if project is None:
-        st.caption("Chưa mở project nào. Dùng sidebar để tạo hoặc mở project.")
-        return
-    st.caption(f"**{project.config.title}** · `{project.slug}` · `{project.config.project_id}`")
-    project_tree.render(project, key=KEY_TREE_NODE)
 
 
 def _render_arbiter_pane(project: Project | None, *, llm_client: LLMClient | None) -> None:
@@ -386,6 +405,11 @@ def _render_arbiter_pane(project: Project | None, *, llm_client: LLMClient | Non
         )
 
     st.markdown("**Bước tiếp theo**")
+    if llm_client is None:
+        st.caption(
+            "Chưa dựng được LLM client: vẫn xem và điều hướng workspace được, "
+            "nhưng chưa generate được."
+        )
     if not report.suggestions:
         st.caption("Không có gợi ý; mọi bước hiện tại đã hoàn tất.")
         return
@@ -395,24 +419,25 @@ def _render_arbiter_pane(project: Project | None, *, llm_client: LLMClient | Non
         workspace_label = workspace_labels.get(suggestion.workspace, suggestion.workspace)
         st.markdown(f"- `{workspace_label}` — {suggestion.label}{marker}  \n  {suggestion.reason}")
         button_key = f"novel_ai_arbiter_open_{index}_{suggestion.code}"
-        if st.button(
+        # Điều hướng chỉ đổi workspace đang xem: không generate, không mutation và
+        # không phụ thuộc LLM client (BUG-002 + T28 acceptance).
+        st.button(
             f"Chuyển tới {workspace_label}",
             key=button_key,
-            disabled=llm_client is None and suggestion.workspace in _LLM_WORKSPACES,
-        ):
-            st.session_state[KEY_WORKSPACE] = suggestion.workspace
-            st.session_state[KEY_WORKSPACE_NAV] = label_for_workspace(suggestion.workspace)
-            st.rerun()
-
-
-#: Workspace cần LLM client mới làm được gì đó (dùng để disable nút điều hướng).
-_LLM_WORKSPACES = frozenset(
-    {"co_create", "architect", "long_plan", "short_plan", "skeleton", "writer", "review", "reconcile", "revision"}
-)
+            on_click=navigate_to_workspace,
+            args=(suggestion.workspace,),
+        )
 
 
 def run() -> None:
-    """Entrypoint Streamlit: nav trên, 3 pane giữa, status bar dưới (spec mục 28)."""
+    """Entrypoint Streamlit: nav trên, workspace full-width, drawer trái, status bar dưới.
+
+    Bố cục theo D018 (`decisions.md`) — refinement của spec mục 28: giữ **vai trò**
+    Project / Current Workspace / Arbiter nhưng bỏ ba cột luôn mở. Project nằm trong
+    sidebar trái native (drawer), Arbiter là control compact ở toolbar và chỉ chiếm
+    cột khi user mở; cảnh báo recovery/read-only/stale vẫn hiện ở main kể cả khi
+    panel đóng.
+    """
     import streamlit as st
 
     st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON, layout="wide")
@@ -427,6 +452,7 @@ def run() -> None:
         st.markdown(f'<div class="dsh-shell-title">{PAGE_TITLE}</div>', unsafe_allow_html=True)
         st.caption("State bền nằm ở file project; UI chỉ giữ working state.")
         project = select_project(app_config)
+        _render_project_drawer(project)
         _render_llm_block(app_config, llm_client, llm_error)
         if registry_error:
             st.warning(registry_error)
@@ -444,35 +470,26 @@ def run() -> None:
 
     if project is not None:
         render_recovery_banner(project)
+        _render_blocking_notices(project)
 
-    project_pane, workspace_pane, arbiter_pane = st.columns(
-        [1.05, 2.1, 1.15], gap="medium"
-    )
-    with project_pane:
-        _render_project_pane(project)
-    with workspace_pane:
-        st.markdown('<div class="dsh-pane-title">Current workspace</div>', unsafe_allow_html=True)
-        st.caption(
-            f"`{workspace}` — {label_for_workspace(workspace)}"
-            + (f" · {project.config.title}" if project is not None else "")
+    panel_open = _render_toolbar(project, workspace)
+    if project is not None and panel_open:
+        workspace_col, arbiter_col = st.columns([3.5, 1], gap="medium")
+    else:
+        workspace_col, arbiter_col = st.container(), None
+
+    with workspace_col:
+        _render_workspace_area(
+            project,
+            workspace=workspace,
+            registry=registry,
+            app_config=app_config,
+            llm_client=llm_client,
+            llm_error=llm_error,
         )
-        if project is None:
-            st.info(
-                "Chưa có project nào đang mở. Tạo project mới hoặc mở project có sẵn ở "
-                "sidebar để bắt đầu."
-            )
-        else:
-            ctx = AppContext(
-                app_config=app_config,
-                project=project,
-                registry=registry,
-                workspace=workspace,
-                llm_client=llm_client,
-                llm_error=llm_error,
-            )
-            render_workspace(ctx)
-    with arbiter_pane:
-        _render_arbiter_pane(project, llm_client=llm_client)
+    if arbiter_col is not None and project is not None:
+        with arbiter_col:
+            _render_arbiter_pane(project, llm_client=llm_client)
 
     _render_status_bar_footer(
         project,
@@ -481,6 +498,113 @@ def run() -> None:
         llm_client=llm_client,
         llm_error=llm_error,
     )
+
+
+def _render_blocking_notices(project: Project) -> None:
+    """Cảnh báo quan trọng phải thấy **kể cả khi panel Project/Arbiter đóng** (D018).
+
+    Chỉ đọc state: không tự chạy action, không ghi file.
+    """
+    import streamlit as st
+
+    arbiter_report = arbiter.analyze(project)
+    if arbiter_report.stale_artifact_ids:
+        st.warning(
+            "Artifact đang stale (cần review trước khi dùng tiếp): "
+            + ", ".join(f"`{artifact_id}`" for artifact_id in arbiter_report.stale_artifact_ids)
+        )
+    next_step = arbiter_report.next_step
+    if next_step is None:
+        return
+    marker = " · blocking" if next_step.blocking else ""
+    st.caption(f"Bước gợi ý: {next_step.label}{marker} — {next_step.reason}")
+
+
+def _render_toolbar(project: Project | None, workspace: str) -> bool:
+    """Toolbar: tiêu đề workspace + control Arbiter compact. Trả `panel_open`."""
+    import streamlit as st
+
+    title_col, arbiter_col = st.columns([4, 1.4], gap="small")
+    with title_col:
+        st.markdown(
+            '<div class="dsh-pane-title">Current workspace</div>', unsafe_allow_html=True
+        )
+        st.caption(
+            f"`{workspace}` — {label_for_workspace(workspace)}"
+            + (f" · {project.config.title}" if project is not None else "")
+        )
+    if project is None:
+        return False
+
+    report = arbiter.analyze(project)
+    with arbiter_col:
+        st.button(
+            ("▾ " if st.session_state.get(KEY_ARBITER_OPEN) else "▸ ")
+            + arbiter.compact_label(report),
+            key=KEY_ARBITER_TOGGLE,
+            on_click=toggle_arbiter_panel,
+            help="Mở/đóng chi tiết Arbiter. Đóng panel để workspace rộng hơn.",
+        )
+    return bool(st.session_state.get(KEY_ARBITER_OPEN))
+
+
+def toggle_arbiter_panel() -> None:
+    """`on_click` callback: đổi trạng thái panel Arbiter trước khi script rerun.
+
+    Dùng callback (giống `navigate_to_workspace`) để không phải sửa session state
+    của widget đã instantiate trong cùng run.
+    """
+    import streamlit as st
+
+    st.session_state[KEY_ARBITER_OPEN] = not bool(st.session_state.get(KEY_ARBITER_OPEN))
+
+
+def _render_workspace_area(
+    project: Project | None,
+    *,
+    workspace: str,
+    registry: PromptRegistry | None,
+    app_config: AppConfig,
+    llm_client: LLMClient | None,
+    llm_error: str | None,
+) -> None:
+    """Vùng nội dung chính: full-width khi panel Arbiter đóng."""
+    import streamlit as st
+
+    if project is None:
+        st.info(
+            "Chưa có project nào đang mở. Tạo project mới hoặc mở project có sẵn ở "
+            "sidebar để bắt đầu."
+        )
+        return
+    ctx = AppContext(
+        app_config=app_config,
+        project=project,
+        registry=registry,
+        workspace=workspace,
+        llm_client=llm_client,
+        llm_error=llm_error,
+    )
+    render_workspace(ctx)
+
+
+def _render_project_drawer(project: Project | None) -> None:
+    """Sidebar trái: selector/metadata/cây project + chọn node ngữ cảnh (D018, T32).
+
+    Cây vẫn dùng renderer T27 (một tầng expander, không lồng nhau) và cùng
+    `KEY_TREE_NODE` như trước, nên mở/đóng panel không mất node/chapter đang chọn.
+    """
+    import streamlit as st
+
+    st.markdown('<div class="dsh-pane-title">Project</div>', unsafe_allow_html=True)
+    if project is None:
+        st.caption("Chưa mở project nào. Dùng mục trên để tạo hoặc mở project.")
+        return
+    st.caption(
+        f"**{project.config.title}** · `{project.slug}` · `{project.config.project_id}`"
+    )
+    project_tree.render(project, key=KEY_TREE_NODE)
+
 
 
 # ---------------------------------------------------------------------------

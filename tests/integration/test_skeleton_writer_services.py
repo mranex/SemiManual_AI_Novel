@@ -495,3 +495,194 @@ def test_writer_does_not_mutate_upstream_files(tmp_path: Path, t02_valid_documen
 
     after = {str(path): storage.file_fingerprint(path) for path in tracked}
     assert after == before
+
+
+# ---------------------------------------------------------------------------
+# T33 — event generation cho Writer (D019, schemas.md mục 11)
+# ---------------------------------------------------------------------------
+
+
+def _events() -> tuple[list, object]:
+    collected: list = []
+    return collected, collected.append
+
+
+def test_writer_stream_emits_documented_event_order(
+    tmp_path: Path, t02_valid_document
+) -> None:
+    project = seed_project(tmp_path, t02_valid_document, chapter_one_status=ChapterStatus.planned)
+    client = FakeLLMClient()
+    client.queue_stream("Một ", "hai.", " ba.")
+    events, sink = _events()
+
+    result = writer.generate_draft(
+        project,
+        client=client,
+        chapter_id="ch_0001",
+        stream=True,
+        on_event=sink,
+        attempt=3,
+    )
+
+    statuses = [event.status for event in events]
+    assert statuses[0] == "connecting"
+    assert statuses[1] == "streaming"
+    assert statuses[-3:] == ["transport_complete", "validating", "saved"]
+    assert all(event.transport == "streaming" for event in events)
+    assert all(event.attempt == 3 for event in events)
+    # Delta chỉ mang text tăng dần; `saved` mới là candidate ready.
+    assert "".join(event.text_delta for event in events) == "Một hai. ba."
+    assert [event.candidate_ready for event in events] == [
+        False
+    ] * (len(events) - 1) + [True]
+    assert events[-1].raw_ref
+    assert result.data["is_complete"] is True
+    assert storage.load_chapter(project, "ch_0001").status is ChapterStatus.review_required
+
+
+def test_writer_stream_interrupt_emits_partial_not_saved(
+    tmp_path: Path, t02_valid_document
+) -> None:
+    project = seed_project(tmp_path, t02_valid_document, chapter_one_status=ChapterStatus.planned)
+    client = FakeLLMClient()
+    client.queue_stream("Mở đầu", STREAM_INTERRUPTED)
+    events, sink = _events()
+
+    result = writer.generate_draft(
+        project, client=client, chapter_id="ch_0001", stream=True, on_event=sink
+    )
+
+    assert [event.status for event in events][-1] == "partial"
+    assert not any(event.candidate_ready for event in events)
+    assert result.data["is_complete"] is False
+    # Partial vẫn được giữ trên disk để phục hồi, nhưng không mở review/finalize.
+    chapter = storage.load_chapter(project, "ch_0001")
+    assert chapter.status is ChapterStatus.draft
+    assert chapter.current_draft is not None and chapter.current_draft.is_complete is False
+
+
+def test_writer_error_before_delta_emits_error_and_changes_nothing(
+    tmp_path: Path, t02_valid_document
+) -> None:
+    project = seed_project(tmp_path, t02_valid_document, chapter_one_status=ChapterStatus.planned)
+    client = FakeLLMClient()
+    client.queue_stream(LLMError("provider chết trước delta"))
+    events, sink = _events()
+
+    with pytest.raises(LLMUnavailableError):
+        writer.generate_draft(
+            project, client=client, chapter_id="ch_0001", stream=True, on_event=sink
+        )
+
+    assert [event.status for event in events][-1] == "error"
+    assert not any(event.candidate_ready for event in events)
+    chapter = storage.load_chapter(project, "ch_0001")
+    assert chapter.drafts == []
+    assert chapter.status is ChapterStatus.planned
+
+
+def test_writer_empty_output_emits_invalid_and_keeps_no_revision(
+    tmp_path: Path, t02_valid_document
+) -> None:
+    project = seed_project(tmp_path, t02_valid_document, chapter_one_status=ChapterStatus.planned)
+    events, sink = _events()
+
+    result = writer.generate_draft(
+        project,
+        client=FakeLLMClient(["Xin lỗi, tôi không thể viết chương này."]),
+        chapter_id="ch_0001",
+        on_event=sink,
+    )
+
+    statuses = [event.status for event in events]
+    assert statuses[:2] == ["connecting", "non_streaming"]
+    assert statuses[-1] == "invalid"
+    assert not any(event.candidate_ready for event in events)
+    assert result.data["revision"] is None
+    assert storage.load_chapter(project, "ch_0001").drafts == []
+
+
+def test_writer_non_streaming_run_never_emits_delta(
+    tmp_path: Path, t02_valid_document
+) -> None:
+    project = seed_project(tmp_path, t02_valid_document, chapter_one_status=ChapterStatus.planned)
+    events, sink = _events()
+
+    writer.generate_draft(
+        project,
+        client=FakeLLMClient([COMPLETE_PROSE]),
+        chapter_id="ch_0001",
+        on_event=sink,
+    )
+
+    assert [event.status for event in events] == [
+        "connecting",
+        "non_streaming",
+        "transport_complete",
+        "validating",
+        "saved",
+    ]
+    assert all(event.transport == "non_streaming" for event in events)
+    assert all(event.text_delta == "" for event in events)
+
+
+def test_writer_replay_emits_saved_without_second_llm_call(
+    tmp_path: Path, t02_valid_document
+) -> None:
+    project = seed_project(tmp_path, t02_valid_document, chapter_one_status=ChapterStatus.planned)
+    client = FakeLLMClient([COMPLETE_PROSE])
+    first_events, first_sink = _events()
+    writer.generate_draft(
+        project,
+        client=client,
+        chapter_id="ch_0001",
+        operation_id="op_t33_replay",
+        on_event=first_sink,
+    )
+    revision = storage.load_chapter(project, "ch_0001").current_draft_revision
+
+    # Bấm lặp cùng operation_id: replay, không gọi LLM, không tạo revision thứ hai.
+    replay_client = FakeLLMClient([COMPLETE_PROSE])
+    replay_events, replay_sink = _events()
+    result = writer.generate_draft(
+        project,
+        client=replay_client,
+        chapter_id="ch_0001",
+        operation_id="op_t33_replay",
+        on_event=replay_sink,
+    )
+
+    assert [event.status for event in replay_events] == ["saved"]
+    assert replay_events[0].candidate_ready is True
+    assert replay_client.calls == []
+    assert storage.load_chapter(project, "ch_0001").current_draft_revision == revision
+    assert result.data.get("stream_status") is not None
+
+
+def test_writer_persist_failure_emits_error_and_keeps_state(
+    tmp_path: Path, t02_valid_document, monkeypatch
+) -> None:
+    """Lỗi ghi trong bước validate/persist: state `error`, không treo ở `validating`."""
+    project = seed_project(tmp_path, t02_valid_document, chapter_one_status=ChapterStatus.planned)
+    events, sink = _events()
+
+    def _boom(*args, **kwargs):
+        raise OSError("đĩa hỏng")
+
+    monkeypatch.setattr(storage, "write_markdown", _boom)
+
+    with pytest.raises(OSError):
+        writer.generate_draft(
+            project,
+            client=FakeLLMClient([COMPLETE_PROSE]),
+            chapter_id="ch_0001",
+            on_event=sink,
+        )
+
+    statuses = [event.status for event in events]
+    assert statuses[-1] == "error"
+    assert "validating" in statuses
+    assert not any(event.candidate_ready for event in events)
+    chapter = storage.load_chapter(project, "ch_0001")
+    assert chapter.drafts == []
+    assert chapter.status is ChapterStatus.planned

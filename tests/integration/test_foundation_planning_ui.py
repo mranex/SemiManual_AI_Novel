@@ -157,7 +157,15 @@ def _seed_base_idea(project: Project, *, markdown: str = "Base Idea test.\n") ->
 
 
 def _seed_foundation(project: Project) -> None:
-    """Accepted base idea + premise + characters/world_rules/foreshadow tối thiểu."""
+    """Accepted base idea + premise + characters/world_rules/foreshadow tối thiểu.
+
+    Kèm default viết của project (D016) để request Short Plan hợp lệ; test nào cần
+    đường "thiếu default" thì xoá lại hai field này sau khi seed.
+    """
+    project.update_config(
+        default_pov="ngôi ba giới hạn theo Sở Dương",
+        default_length_guidance="1500–2000 từ",
+    )
     _seed_base_idea(project)
     _seed_artifact(project, "premise", "premise", _premise_payload())
     _seed_reference_foundation(project)
@@ -340,6 +348,13 @@ _project = Project.open(config.projects_root, os.environ["NOVEL_AI_TEST_SLUG"])
 CLIENT = st.session_state.get("__t20_client")
 if CLIENT is None:
     CLIENT = FakeLLMClient(json.loads(os.environ.get("NOVEL_AI_TEST_RESPONSES") or "[]"))
+    _stream = json.loads(os.environ.get("NOVEL_AI_TEST_STREAM") or "[]")
+    if _stream:
+        from novel_ai.core.llm import STREAM_INTERRUPTED
+
+        CLIENT.queue_stream(
+            *[STREAM_INTERRUPTED if item == "interrupted" else item for item in _stream]
+        )
     st.session_state["__t20_client"] = CLIENT
 ctx = layout.AppContext(
     app_config=config,
@@ -361,12 +376,19 @@ def apptest_factory(tmp_path: Path, projects_root: Path, monkeypatch: pytest.Mon
     monkeypatch.setenv("NOVEL_AI_TEST_PROJECTS_ROOT", str(projects_root))
 
     def build(
-        project: Project, workspace: str, responses: list[Any] | None = None
+        project: Project,
+        workspace: str,
+        responses: list[Any] | None = None,
+        *,
+        stream: list[Any] | None = None,
     ) -> AppTest:
         monkeypatch.setenv("NOVEL_AI_TEST_SLUG", project.slug)
         monkeypatch.setenv("NOVEL_AI_TEST_WORKSPACE", workspace)
         monkeypatch.setenv(
             "NOVEL_AI_TEST_RESPONSES", json.dumps(responses or [], ensure_ascii=False)
+        )
+        monkeypatch.setenv(
+            "NOVEL_AI_TEST_STREAM", json.dumps(stream or [], ensure_ascii=False)
         )
         at = AppTest.from_file(str(harness))
         at.session_state["novel_ai_open_project"] = project.slug
@@ -627,8 +649,209 @@ def test_eligible_chapters_for_rolling_excludes_final(projects_root: Path) -> No
 
 
 # ---------------------------------------------------------------------------
+# 4. T34 — structured stream trên page planning
+# ---------------------------------------------------------------------------
+
+
+def test_long_plan_page_streams_json_and_reports_saved(
+    projects_root: Path, apptest_factory
+) -> None:
+    """Structured stream: delta hiện dần, chỉ `saved` mới báo validate/lưu."""
+    from novel_ai.ui import generation
+
+    project = _project_with_long_plan(projects_root, "Truyện Stream JSON")
+    payload = json.dumps(_long_plan_payload(end=40), ensure_ascii=False)
+    half = max(1, len(payload) // 2)
+    # Project đã có accepted Long Plan ⇒ generate lại là thao tác tường minh với
+    # horizon rộng hơn; candidate mới không tự thay accepted cũ.
+    at = apptest_factory(project, "long_plan", stream=[payload[:half], payload[half:], ""])
+
+    assert not at.exception
+    at.number_input(key="novel_ai_long_plan_scope_start").set_value(1)
+    at.number_input(key="novel_ai_long_plan_scope_end").set_value(40)
+    _submit(at, "FormSubmitter:novel_ai_long_plan_generate-Chạy generate/regenerate")
+
+    assert not at.exception
+    rendered_text = _rendered(at)
+    assert "đã validate và lưu" in rendered_text
+    assert "Raw preview" in rendered_text
+    scoped = generation.scope_key(
+        project_id=project.config.project_id, workspace="long_plan", artifact_id="long_plan"
+    )
+    transcript = at.session_state[generation.KEY_TRANSCRIPT][scoped]
+    assert transcript["state"] == "saved"
+    assert transcript["transport"] == "streaming"
+    assert [event["status"] for event in transcript["events"]][-1] == "saved"
+    envelope = _artifact(project, "long_plan")
+    assert envelope.candidate_revision is not None
+    # Accepted cũ giữ nguyên (candidate mới chưa accept).
+    assert envelope.accepted_revision.revision == 1
+
+
+def test_long_plan_page_partial_stream_does_not_create_candidate(
+    projects_root: Path, apptest_factory
+) -> None:
+    project = _project_with_long_plan(projects_root, "Truyện Stream Đứt")
+    payload = json.dumps(_long_plan_payload(end=40), ensure_ascii=False)
+    half = max(1, len(payload) // 2)
+    at = apptest_factory(project, "long_plan", stream=[payload[:half], "interrupted"])
+
+    assert not at.exception
+    at.number_input(key="novel_ai_long_plan_scope_start").set_value(1)
+    at.number_input(key="novel_ai_long_plan_scope_end").set_value(40)
+    _submit(at, "FormSubmitter:novel_ai_long_plan_generate-Chạy generate/regenerate")
+
+    assert not at.exception
+    rendered_text = _rendered(at)
+    assert "partial — chưa dùng được" in rendered_text
+    assert "không" in rendered_text and "auto accept" in rendered_text
+    envelope = _artifact(project, "long_plan")
+    assert envelope.candidate_revision is None
+    assert envelope.accepted_revision.revision == 1
+
+
+# ---------------------------------------------------------------------------
 # 2. AppTest: luồng chính
 # ---------------------------------------------------------------------------
+
+
+def _single_arc_payload(*, start: int, end: int) -> dict[str, Any]:
+    return {
+        "volumes": [
+            {
+                "volume_id": "vol_0001",
+                "title": "Quyển 1",
+                "theme": "t",
+                "goal": "g",
+                "arcs": [
+                    {
+                        "arc_id": "arc_0001",
+                        "title": "Arc duy nhất",
+                        "chapter_range": {"start": start, "end": end},
+                        "goal": "g",
+                        "core_conflict": "c",
+                        "start_state": "s",
+                        "end_state": "e",
+                        "major_reveals": [],
+                        "character_ids": ["char_0001"],
+                        "world_rule_ids": ["rule_0001"],
+                        "foreshadow_ids": ["fs_0001"],
+                        "relationship_directions": [],
+                    }
+                ],
+            }
+        ],
+        "global_threads": [],
+    }
+
+
+def test_long_plan_page_requires_horizon_before_calling_llm(
+    projects_root: Path, apptest_factory
+) -> None:
+    """T30/BUG-004: page không còn prefill horizon từ tiến độ; thiếu input ⇒ zero call."""
+    project = Project.create(projects_root, "Truyện Horizon")
+    _seed_foundation(project)
+    root = project.root
+
+    at = apptest_factory(
+        project, "long_plan", responses=[json.dumps(_single_arc_payload(start=1, end=40))]
+    )
+
+    assert not at.exception
+    # Không có horizon đã lưu ⇒ hai ô nhập trống, không suy từ current_chapter.
+    assert at.number_input(key="novel_ai_long_plan_scope_start").value is None
+    assert at.number_input(key="novel_ai_long_plan_scope_end").value is None
+    assert "Project chưa có horizon nào được lưu" in _rendered(at)
+    before = _fingerprint_tree(root)
+
+    _submit(at, "FormSubmitter:novel_ai_long_plan_generate-Chạy generate/regenerate")
+
+    assert not at.exception
+    assert "Cần nhập đủ `planning_scope.start`" in _rendered(at)
+    assert _client(at).calls == []
+    assert _artifact(project, "long_plan") is None
+    assert _fingerprint_tree(root) == before
+
+
+def test_long_plan_page_previews_coverage_and_single_arc_warning(
+    projects_root: Path, apptest_factory
+) -> None:
+    project = Project.create(projects_root, "Truyện Preview")
+    _seed_foundation(project)
+
+    at = apptest_factory(
+        project, "long_plan", responses=[json.dumps(_single_arc_payload(start=1, end=40))]
+    )
+    at.number_input(key="novel_ai_long_plan_scope_start").set_value(1)
+    at.number_input(key="novel_ai_long_plan_scope_end").set_value(40)
+    _submit(at, "FormSubmitter:novel_ai_long_plan_generate-Chạy generate/regenerate")
+
+    assert not at.exception
+    rendered = _rendered(at)
+    assert "Preview coverage" in rendered
+    assert "Horizon 1–40 (40 chương) · 1 volume · 1 arc · 40 chương được phủ" in rendered
+    assert "Coverage liên tục và phủ đúng hai đầu horizon." in rendered
+    assert "chỉ có một arc" in rendered
+    assert "`planning_scope` của candidate: 1–40" in rendered
+    # Accepted vẫn trống: candidate chưa được accept.
+    assert _artifact(project, "long_plan").accepted_revision is None
+
+
+def test_long_plan_page_legacy_banner_and_confirm_action(
+    projects_root: Path, apptest_factory
+) -> None:
+    """Accepted revision legacy: page cảnh báo, chỉ migrate bằng action tường minh."""
+    project = Project.create(projects_root, "Truyện Legacy")
+    _seed_foundation(project)
+    _seed_artifact(
+        project, "long_plan", "long_plan", _single_arc_payload(start=1, end=40)
+    )
+    root = project.root
+    before = _fingerprint_tree(root)
+
+    at = apptest_factory(project, "long_plan")
+
+    assert not at.exception
+    assert "legacy" in _rendered(at)
+    assert "novel_ai_long_plan_confirm_start" in [
+        widget.key for widget in at.number_input
+    ]
+    # Chỉ render: chưa ghi file nào.
+    assert _fingerprint_tree(root) == before
+
+    at.number_input(key="novel_ai_long_plan_confirm_start").set_value(1)
+    at.number_input(key="novel_ai_long_plan_confirm_end").set_value(40)
+    _submit(
+        at, "FormSubmitter:novel_ai_long_plan_confirm_scope-Xác nhận horizon cho accepted revision"
+    )
+
+    assert not at.exception
+    envelope = _artifact(project, "long_plan")
+    assert envelope.accepted_revision.planning_scope.start == 1
+    assert envelope.accepted_revision.planning_scope.end == 40
+    # Payload không bị sửa bởi migration.
+    assert [len(volume.arcs) for volume in envelope.accepted_revision.payload.volumes] == [1]
+
+
+def test_long_plan_page_rejects_horizon_not_covering_legacy_payload(
+    projects_root: Path, apptest_factory
+) -> None:
+    project = Project.create(projects_root, "Truyện Legacy Lệch")
+    _seed_foundation(project)
+    _seed_artifact(
+        project, "long_plan", "long_plan", _single_arc_payload(start=1, end=40)
+    )
+
+    at = apptest_factory(project, "long_plan")
+    at.number_input(key="novel_ai_long_plan_confirm_start").set_value(1)
+    at.number_input(key="novel_ai_long_plan_confirm_end").set_value(10)
+    _submit(
+        at, "FormSubmitter:novel_ai_long_plan_confirm_scope-Xác nhận horizon cho accepted revision"
+    )
+
+    assert not at.exception
+    assert "scope_does_not_cover_payload" in _rendered(at) or "không khớp coverage" in _rendered(at)
+    assert _artifact(project, "long_plan").accepted_revision.planning_scope is None
 
 
 def test_main_flow_create_foundation_and_two_chapter_plan(
@@ -674,14 +897,16 @@ def test_main_flow_create_foundation_and_two_chapter_plan(
     _seed_reference_foundation(project)
     assert _artifact(project, "characters").status is ArtifactStatus.accepted
 
-    # Long Plan: generate trong scope 1-5 rồi accept.
+    # Long Plan: user nhập horizon tường minh 1-2 (không còn default suy từ tiến độ)
+    # rồi generate + accept.
     at = apptest_factory(
         project,
         "long_plan",
         responses=[json.dumps(_long_plan_payload(end=2), ensure_ascii=False)],
     )
     assert not at.exception
-    at.number_input(key="novel_ai_long_plan_scope_end").set_value(5)
+    at.number_input(key="novel_ai_long_plan_scope_start").set_value(1)
+    at.number_input(key="novel_ai_long_plan_scope_end").set_value(2)
     _submit(at, "FormSubmitter:novel_ai_long_plan_generate-Chạy generate/regenerate")
     assert not at.exception
     _click(at, "novel_ai_long_plan_accept")
@@ -689,7 +914,7 @@ def test_main_flow_create_foundation_and_two_chapter_plan(
     long_plan = _artifact(project, "long_plan")
     assert long_plan is not None and long_plan.status is ArtifactStatus.accepted
 
-    # Short Plan: hai chapter trong arc, có chapter_constraints.
+    # Short Plan: hai chapter trong arc, mỗi chapter phải đủ yêu cầu viết (D016).
     at = apptest_factory(
         project,
         "short_plan",
@@ -701,12 +926,14 @@ def test_main_flow_create_foundation_and_two_chapter_plan(
     assigned_key = short_plan_page.assigned_cache_key("arc_0001", long_plan_revision)
     rows = at.session_state[assigned_key]
     assert [row["chapter_number"] for row in rows] == [1, 2]
-    at.text_input(key=f"novel_ai_short_plan_constraint_{rows[0]['chapter_id']}_pov").set_value(
-        "ngôi ba giới hạn"
-    )
-    at.text_input(
-        key=f"novel_ai_short_plan_constraint_{rows[1]['chapter_id']}_length_guidance"
-    ).set_value("1500–2000 từ")
+    for row in rows:
+        chapter_id = row["chapter_id"]
+        at.text_input(
+            key=f"novel_ai_short_plan_constraint_{chapter_id}_pov"
+        ).set_value("ngôi ba giới hạn")
+        at.text_input(
+            key=f"novel_ai_short_plan_constraint_{chapter_id}_length_guidance"
+        ).set_value("1500–2000 từ")
     _submit(at, "FormSubmitter:novel_ai_short_plan_generate_arc_0001-Chạy generate/regenerate")
     assert not at.exception
     assert len(_client(at).calls) == 1
@@ -1035,3 +1262,103 @@ def test_future_append_entry_is_visible_and_keeps_past_chapters_fresh(
     assert plan_after is not None and plan_after.status is plan_status_before
     # Entry mới hiển thị được trong UI (caption ID đã có trong accepted).
     assert "char_0002" in _rendered(at)
+
+
+# ---------------------------------------------------------------------------
+# 3. T31 — default viết của project và guard trước LLM (BUG-003)
+# ---------------------------------------------------------------------------
+
+
+def _project_with_long_plan(projects_root: Path, title: str) -> Project:
+    project = Project.create(projects_root, title)
+    _seed_foundation(project)
+    _seed_long_plan(project, chapters=2)
+    return project
+
+
+def test_build_chapter_constraint_values_uses_project_defaults() -> None:
+    assigned = [{"chapter_id": "ch_0001", "chapter_number": 1}]
+
+    values = short_plan_page.build_chapter_constraint_values(
+        assigned,
+        {},
+        default_language="vi",
+        default_pov="ngôi ba giới hạn",
+        default_length_guidance="1500 từ",
+    )
+
+    assert values["ch_0001"] == {
+        "language": "vi",
+        "pov": "ngôi ba giới hạn",
+        "length_guidance": "1500 từ",
+    }
+    # Default rỗng vẫn để rỗng: app không bịa POV/độ dài.
+    empty = short_plan_page.build_chapter_constraint_values(
+        assigned, {}, default_language="vi", default_pov="", default_length_guidance=""
+    )
+    assert empty["ch_0001"]["pov"] == ""
+    assert empty["ch_0001"]["length_guidance"] == ""
+
+
+def test_short_plan_page_blocks_generate_when_defaults_missing(
+    projects_root: Path, apptest_factory
+) -> None:
+    """BUG-003: thiếu default ⇒ UI báo rõ và service không được gọi."""
+    project = _project_with_long_plan(projects_root, "Truyện Thiếu Default")
+    project.update_config(default_pov="", default_length_guidance="")
+    project.reload()
+
+    at = apptest_factory(
+        project, "short_plan", responses=[json.dumps(_short_plan_two_chapters())]
+    )
+
+    assert not at.exception
+    rendered = _rendered(at)
+    assert "Project chưa thiết lập default cho" in rendered
+    assert "`pov`" in rendered and "`length_guidance`" in rendered
+
+    _submit(at, "FormSubmitter:novel_ai_short_plan_generate_arc_0001-Chạy generate/regenerate")
+
+    assert not at.exception
+    assert _client(at).calls == []
+    assert "missing_writing_contract" in _rendered(at)
+    assert "không gọi LLM" in _rendered(at)
+    envelope = _artifact(project, "short_plan")
+    assert envelope is None or envelope.candidate_revision is None
+
+
+def test_short_plan_page_saves_writing_defaults_without_llm(
+    projects_root: Path, apptest_factory
+) -> None:
+    project = _project_with_long_plan(projects_root, "Truyện Lưu Default")
+    project.update_config(default_pov="", default_length_guidance="")
+    project.reload()
+    root = project.root
+
+    at = apptest_factory(project, "short_plan")
+
+    assert not at.exception
+    at.text_input(key="novel_ai_writing_default_pov").set_value("ngôi ba giới hạn")
+    at.text_input(key="novel_ai_writing_default_length").set_value("1500–2000 từ")
+    _submit(at, "FormSubmitter:novel_ai_writing_defaults-Lưu default viết")
+
+    assert not at.exception
+    reloaded = Project.open(root.parent, project.slug)
+    assert reloaded.config.default_pov == "ngôi ba giới hạn"
+    assert reloaded.config.default_length_guidance == "1500–2000 từ"
+    # Save default không gọi LLM và không tạo candidate.
+    assert _client(at).calls == []
+    envelope = _artifact(reloaded, "short_plan")
+    assert envelope is None or envelope.candidate_revision is None
+
+    # Sau khi lưu default, request generate hợp lệ và gọi LLM đúng một lần.
+    at2 = apptest_factory(
+        reloaded, "short_plan", responses=[json.dumps(_short_plan_two_chapters())]
+    )
+    assert not at2.exception
+    assert "Project chưa thiết lập default" not in _rendered(at2)
+    _submit(at2, "FormSubmitter:novel_ai_short_plan_generate_arc_0001-Chạy generate/regenerate")
+    assert not at2.exception
+    assert len(_client(at2).calls) == 1
+    candidate = _artifact(reloaded, "short_plan")
+    assert candidate is not None and candidate.candidate_revision is not None

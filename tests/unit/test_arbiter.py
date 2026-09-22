@@ -24,6 +24,7 @@ from novel_ai.core.models import (
     ValidationState,
 )
 from novel_ai.core.project import Project
+from novel_ai.ui import arbiter
 from novel_ai.ui.arbiter import analyze, summarize
 
 _STAMP = "2026-09-19T10:00:00+07:00"
@@ -438,3 +439,55 @@ def _minimal_payload(artifact_type: str) -> dict:
     if artifact_type == "foreshadow":
         return {"foreshadows": []}
     raise AssertionError(f"Không có payload mẫu cho {artifact_type}")
+
+
+# ---------------------------------------------------------------------------
+# T32 — nhãn compact cho control Arbiter
+# ---------------------------------------------------------------------------
+
+
+def test_badge_summary_counts_blockers_stale_and_recovery() -> None:
+    report = arbiter.ArbiterReport(
+        project_id="proj_0001",
+        current_chapter=1,
+        suggestions=[
+            arbiter.ArbiterSuggestion(
+                code="generate_skeleton", label="Generate Skeleton", workspace="skeleton",
+                reason="r", blocking=True,
+            ),
+            arbiter.ArbiterSuggestion(
+                code="rolling_plan_due", label="Rolling Plan review", workspace="short_plan",
+                reason="r",
+            ),
+        ],
+        stale_artifact_ids=["short_plan"],
+        rolling_due=True,
+    )
+
+    summary = arbiter.badge_summary(report)
+
+    assert "1 blocker" in summary
+    assert "1 stale" in summary
+    assert "rolling due" in summary
+    assert arbiter.compact_label(report) == f"Arbiter · {summary}"
+
+
+def test_badge_summary_reports_recovery_and_no_blocker_state() -> None:
+    quiet = arbiter.ArbiterReport(project_id="proj_0001", current_chapter=1)
+    assert arbiter.badge_summary(quiet) == "không blocker"
+
+    recovery = arbiter.ArbiterReport(
+        project_id="proj_0001",
+        current_chapter=1,
+        needs_recovery=True,
+        pending_operation_ids=["op_1"],
+    )
+    assert arbiter.badge_summary(recovery) == "cần recovery"
+
+    read_only = arbiter.ArbiterReport(
+        project_id="proj_0001",
+        current_chapter=1,
+        needs_recovery=True,
+        read_only=True,
+    )
+    assert arbiter.badge_summary(read_only) == "read-only"

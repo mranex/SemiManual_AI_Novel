@@ -64,6 +64,7 @@ from novel_ai.core.models import (
     generate_operation_id,
     now_iso,
 )
+from novel_ai.core.generation import EventSink, GenerationEmitter
 from novel_ai.core.project import Project
 from novel_ai.core.prompts import PromptError, PromptRegistry, render_prompt
 from novel_ai.services import (
@@ -74,6 +75,7 @@ from novel_ai.services import (
     StaleDependencyError,
     ValidationFailure,
 )
+from novel_ai.services.co_create import generation_stage, structured_transport
 
 __all__ = [
     "REVIEW_PROMPT_ID",
@@ -361,17 +363,35 @@ def run_ai_review(
     review_focus: str = "",
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Chạy AI Review trên draft hiện tại và lưu report.
 
     Yêu cầu draft `is_complete`. Report được lưu thành artifact
     `review_report_<chapter_id>` và thêm `ReviewReportRef` vào chapter; report
-    **không** sửa prose, không đổi chapter status, không finalize.
+    **không** sửa prose, không đổi chapter status, không finalize. Stream hoàn tất
+    cũng **không** biến report thành canon — report chỉ là dữ liệu hỗ trợ.
+    `on_event` nhận `GenerationEvent` (T33/T35, D019).
     """
     stamp = now or now_iso()
     op_id = operation_id or generate_operation_id()
     chapter, draft = _require_draft(project, chapter_id)
     prose_markdown = _draft_text(project, chapter, draft.revision)
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action="review.ai_review",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=REVIEW_PROMPT_ID,
+            artifact_id=f"review_report_{chapter_id}",
+            chapter_id=chapter_id,
+        )
+        if on_event is not None
+        else None
+    )
 
     try:
         bundle = build_review_context(
@@ -392,61 +412,67 @@ def run_ai_review(
         prompt_version=rendered.prompt_version,
         prompt_hash=rendered.template_hash,
     )
-    raw_text = _call_complete(client, request, label="chạy AI Review")
-    raw_ref = storage.save_raw_output(
+    transport = structured_transport(
         project,
+        client=client,
+        request=request,
         operation_id=op_id,
-        text=raw_text,
         label=f"review_{chapter_id}",
-        day=(stamp[:10] if len(stamp) >= 10 else None),
+        emitter=emitter,
+        stream=stream,
+        now=stamp,
+        prompt_id=REVIEW_PROMPT_ID,
     )
-    payload = _parse_payload(
-        raw_text, ReviewReportPayload, raw_ref=raw_ref, label="AI Review output"
-    )
-
-    if payload.chapter_id != chapter_id:
-        raise ValidationFailure(
-            f"Report khai `{payload.chapter_id}` nhưng action là `{chapter_id}`.",
-            code="review_chapter_mismatch",
-            details={"raw_output_ref": raw_ref},
-        )
-    if payload.prose_revision != draft.revision:
-        raise ValidationFailure(
-            f"Report gắn prose r{payload.prose_revision} nhưng draft hiện tại là r{draft.revision}; "
-            "không nhận report của revision khác.",
-            code="review_revision_mismatch",
-            details={"raw_output_ref": raw_ref},
+    raw_text = transport.text
+    raw_ref = transport.raw_ref
+    with generation_stage(emitter, detail="Đang parse/validate AI Review report."):
+        payload = _parse_payload(
+            raw_text, ReviewReportPayload, raw_ref=raw_ref, label="AI Review output"
         )
 
-    result = validation.validate_artifact_payload(
-        "review_report",
-        payload,
-        context=validation.ValidationContext(chapter_number=chapter.chapter_number),
-    )
-    quote_result = _validate_review_quotes(payload, prose_markdown)
-    if not quote_result.is_valid or not result.is_valid:
-        combined = validation.result_from_issues(
-            list(result.errors) + list(quote_result.errors)
-        )
-        raise ValidationFailure(
-            "AI Review report không qua validation: " + validation.summarize_errors(combined),
-            result=combined,
-            code="validation_failed",
-            details={"raw_output_ref": raw_ref},
-        )
+        if payload.chapter_id != chapter_id:
+            raise ValidationFailure(
+                f"Report khai `{payload.chapter_id}` nhưng action là `{chapter_id}`.",
+                code="review_chapter_mismatch",
+                details={"raw_output_ref": raw_ref},
+            )
+        if payload.prose_revision != draft.revision:
+            raise ValidationFailure(
+                f"Report gắn prose r{payload.prose_revision} nhưng draft hiện tại là r{draft.revision}; "
+                "không nhận report của revision khác.",
+                code="review_revision_mismatch",
+                details={"raw_output_ref": raw_ref},
+            )
 
-    artifact_id = lifecycle.artifact_id_for("review_report", chapter_id=chapter_id)
-    envelope = storage.load_artifact(project, artifact_id) or lifecycle.new_artifact(
-        "review_report", artifact_id
-    )
-    source = PayloadSource(
-        source_type=SourceType.llm,
-        prompt_id=rendered.prompt_id,
-        prompt_version=rendered.prompt_version,
-        prompt_hash=rendered.template_hash,
-        operation_id=op_id,
-        raw_output_ref=raw_ref,
-    )
+        result = validation.validate_artifact_payload(
+            "review_report",
+            payload,
+            context=validation.ValidationContext(chapter_number=chapter.chapter_number),
+        )
+        quote_result = _validate_review_quotes(payload, prose_markdown)
+        if not quote_result.is_valid or not result.is_valid:
+            combined = validation.result_from_issues(
+                list(result.errors) + list(quote_result.errors)
+            )
+            raise ValidationFailure(
+                "AI Review report không qua validation: " + validation.summarize_errors(combined),
+                result=combined,
+                code="validation_failed",
+                details={"raw_output_ref": raw_ref},
+            )
+
+        artifact_id = lifecycle.artifact_id_for("review_report", chapter_id=chapter_id)
+        envelope = storage.load_artifact(project, artifact_id) or lifecycle.new_artifact(
+            "review_report", artifact_id
+        )
+        source = PayloadSource(
+            source_type=SourceType.llm,
+            prompt_id=rendered.prompt_id,
+            prompt_version=rendered.prompt_version,
+            prompt_hash=rendered.template_hash,
+            operation_id=op_id,
+            raw_output_ref=raw_ref,
+        )
     pinned = lifecycle.set_candidate(
         envelope,
         payload,
@@ -473,6 +499,14 @@ def run_ai_review(
     for issue in payload.issues:
         severities[issue.severity.value] = severities.get(issue.severity.value, 0) + 1
 
+    if emitter is not None:
+        emitter.saved(
+            detail=(
+                f"AI Review report r{report_revision} đã lưu (report hỗ trợ, không thay "
+                "Human Review và không sửa prose)."
+            ),
+            raw_ref=raw_ref,
+        )
     return ActionResult(
         operation_id=op_id,
         artifact_id=artifact_id,
@@ -593,15 +627,32 @@ def rewrite_section(
     request: RewriteSectionRequest,
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Sinh candidate replacement cho một đoạn prose; **không** tạo revision.
 
     Candidate nằm trong `ActionResult.data["replacement_markdown"]`; user phải
     gọi `apply_rewrite` để thay vào draft (JSON response không auto-apply prose).
+    Stream hoàn tất cũng **không** apply: apply vẫn là action riêng của user.
     """
     stamp = now or now_iso()
     op_id = operation_id or generate_operation_id()
     chapter = _require_chapter(project, request.chapter_id)
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action="review.rewrite_section",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=REWRITE_PROMPT_ID,
+            artifact_id=f"rewrite_{request.chapter_id}",
+            chapter_id=request.chapter_id,
+        )
+        if on_event is not None
+        else None
+    )
     if chapter.current_draft_revision != request.prose_revision:
         raise GuardError(
             f"`{request.chapter_id}` đang ở prose r{chapter.current_draft_revision} nhưng request "
@@ -630,26 +681,32 @@ def rewrite_section(
         prompt_version=rendered.prompt_version,
         prompt_hash=rendered.template_hash,
     )
-    raw_text = _call_complete(client, llm_request, label="rewrite section")
-    raw_ref = storage.save_raw_output(
+    transport = structured_transport(
         project,
+        client=client,
+        request=llm_request,
         operation_id=op_id,
-        text=raw_text,
         label=f"rewrite_{request.chapter_id}",
-        day=(stamp[:10] if len(stamp) >= 10 else None),
+        emitter=emitter,
+        stream=stream,
+        now=stamp,
+        prompt_id=REWRITE_PROMPT_ID,
     )
-    payload = _parse_payload(
-        raw_text, RewriteSectionPayload, raw_ref=raw_ref, label="Rewrite output"
-    )
-
-    result = validation.validate_artifact_payload("rewrite_section", payload)
-    if not result.is_valid:
-        raise ValidationFailure(
-            "Rewrite candidate không qua validation: " + validation.summarize_errors(result),
-            result=result,
-            code="validation_failed",
-            details={"raw_output_ref": raw_ref},
+    raw_text = transport.text
+    raw_ref = transport.raw_ref
+    with generation_stage(emitter, detail="Đang parse/validate Rewrite candidate."):
+        payload = _parse_payload(
+            raw_text, RewriteSectionPayload, raw_ref=raw_ref, label="Rewrite output"
         )
+
+        result = validation.validate_artifact_payload("rewrite_section", payload)
+        if not result.is_valid:
+            raise ValidationFailure(
+                "Rewrite candidate không qua validation: " + validation.summarize_errors(result),
+                result=result,
+                code="validation_failed",
+                details={"raw_output_ref": raw_ref},
+            )
     if payload.replacement_markdown == target:
         warnings.append(
             "Replacement giống hệt target (no-op): không có gì để apply."
@@ -660,6 +717,14 @@ def rewrite_section(
             "trước khi apply."
         )
 
+    if emitter is not None:
+        emitter.saved(
+            detail=(
+                "Rewrite candidate đã validate và trả về; **chưa** apply vào prose "
+                "(apply là action riêng của user)."
+            ),
+            raw_ref=raw_ref,
+        )
     return ActionResult(
         operation_id=op_id,
         chapter_id=request.chapter_id,

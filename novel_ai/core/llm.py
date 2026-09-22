@@ -892,6 +892,7 @@ def generate_structured(
     *,
     repair: Callable[[str], str] | None = None,
     repair_attempts: int = 0,
+    complete: Callable[[LLMRequest], str] | None = None,
 ) -> tuple[TModel | None, str, StructuredOutputError | None]:
     """Gọi LLM rồi parse/validate structured output.
 
@@ -905,11 +906,19 @@ def generate_structured(
     được). Hàm **không** tự lưu raw, **không** accept, **không** chạy bước tiếp:
     caller/service quyết định lưu raw và retry.
 
+    `complete` cho phép caller thay đường transport mặc định (`client.complete`)
+    bằng một hàm trả raw text — service dùng seam này để phát `GenerationEvent`
+    và lưu raw/partial theo contract T33/D019 (stream hay non-stream đều do caller
+    quyết định). Mặc định vẫn là `client.complete`.
+
     Lỗi mạng/auth/timeout từ client được raise nguyên trạng (không bọc thành
     `StructuredOutputError`) vì chưa có output nào để nói về schema.
     """
-    response = client.complete(request)
-    raw_text = response.text if isinstance(response.text, str) else str(response.text)
+    if complete is None:
+        response = client.complete(request)
+        raw_text = response.text if isinstance(response.text, str) else str(response.text)
+    else:
+        raw_text = str(complete(request))
 
     try:
         return parse_structured_text(raw_text, model_cls), raw_text, None

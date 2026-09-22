@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from novel_ai.core.models import ChapterPlan, RelationshipState, Severity
+from novel_ai.core.models import ChapterPlan, LongPlanPayload, RelationshipState, Severity
 from novel_ai.core.validation import (
     DocumentError,
     ReferenceIndex,
@@ -24,6 +24,7 @@ from novel_ai.core.validation import (
     build_reference_index,
     ensure_supported_schema_version,
     find_secret_text,
+    long_plan_horizon_issues,
     parse_artifact_document,
     parse_model,
     partition_by_effective_chapter,
@@ -612,3 +613,116 @@ def test_auto_accept_disabled_allows_manual_prose_path() -> None:
         validate_auto_accept_scope(auto_accept_structured=False, output_kind="markdown").state.value
         == "valid"
     )
+
+
+# ---------------------------------------------------------------------------
+# T30 — Long Plan complete horizon
+# ---------------------------------------------------------------------------
+
+
+def _long_plan(
+    ranges: list[tuple[int, int]], *, splits: list[int] | None = None
+) -> LongPlanPayload:
+    arcs = [
+        {
+            "arc_id": f"arc_{index:04d}",
+            "title": f"Arc {index}",
+            "chapter_range": {"start": low, "end": high},
+            "goal": "g",
+            "core_conflict": "c",
+            "start_state": "s",
+            "end_state": "e",
+            "major_reveals": [],
+            "character_ids": [],
+            "world_rule_ids": [],
+            "foreshadow_ids": [],
+            "relationship_directions": [],
+        }
+        for index, (low, high) in enumerate(ranges, start=1)
+    ]
+    if splits is None:
+        chunks = [arcs]
+    else:
+        assert sum(splits) == len(arcs), "splits phải phủ hết arc"
+        chunks = []
+        cursor = 0
+        for size in splits:
+            chunks.append(arcs[cursor : cursor + size])
+            cursor += size
+    payload_volumes = [
+        {
+            "volume_id": f"vol_{index + 1:04d}",
+            "title": f"Quyển {index + 1}",
+            "theme": "t",
+            "goal": "g",
+            "arcs": chunk,
+        }
+        for index, chunk in enumerate(chunks)
+    ]
+    return LongPlanPayload.model_validate(
+        {"volumes": payload_volumes, "global_threads": []}
+    )
+
+
+def _codes(payload: LongPlanPayload, scope: dict[str, int] | None) -> set[str]:
+    return {issue.code for issue in long_plan_horizon_issues(payload, scope)}
+
+
+def test_horizon_issues_accept_contiguous_multi_volume_coverage() -> None:
+    payload = _long_plan([(1, 20), (21, 45), (46, 80), (81, 120)], splits=[2, 1, 1])
+
+    assert long_plan_horizon_issues(payload, {"start": 1, "end": 120}) == []
+    # Không có scope: chỉ kiểm phần cấu trúc, không bịa coverage.
+    assert long_plan_horizon_issues(payload, None) == []
+
+
+@pytest.mark.parametrize(
+    ("ranges", "expected"),
+    [
+        ([(1, 20), (22, 40)], "gap_in_scope"),
+        ([(2, 20), (21, 40)], "uncovered_scope_start"),
+        ([(1, 20), (21, 39)], "uncovered_scope_end"),
+        ([(1, 20), (20, 40)], "overlap"),
+        ([(1, 20), (21, 41)], "out_of_scope_arc"),
+    ],
+)
+def test_horizon_issues_reject_broken_coverage(
+    ranges: list[tuple[int, int]], expected: str
+) -> None:
+    payload = _long_plan(ranges)
+
+    codes = _codes(payload, {"start": 1, "end": 40})
+
+    assert expected in codes
+
+
+def test_horizon_issues_require_nonempty_volume_and_arcs() -> None:
+    empty = LongPlanPayload.model_validate({"volumes": [], "global_threads": []})
+    assert _codes(empty, {"start": 1, "end": 10}) == {"empty_long_plan"}
+
+    no_arcs = LongPlanPayload.model_validate(
+        {
+            "volumes": [{"volume_id": "vol_0001", "title": "t", "theme": "t", "goal": "g", "arcs": []}],
+            "global_threads": [],
+        }
+    )
+    assert _codes(no_arcs, {"start": 1, "end": 10}) == {"empty_volume"}
+
+
+def test_horizon_issues_accept_single_arc_covering_horizon() -> None:
+    """Một arc phủ đúng horizon hợp lệ về cấu trúc: không có quota số arc (D017)."""
+    payload = _long_plan([(1, 120)])
+
+    assert long_plan_horizon_issues(payload, {"start": 1, "end": 120}) == []
+
+
+def test_artifact_validation_reports_empty_long_plan_without_scope() -> None:
+    """Validator chung (không có scope) vẫn bắt payload rỗng/volume rỗng."""
+    payload = LongPlanPayload.model_validate({"volumes": [], "global_threads": []})
+
+    result = validate_artifact_payload(
+        "long_plan", payload, context=ValidationContext(index=ReferenceIndex())
+    )
+
+    assert result.state.value == "invalid"
+    assert "empty_long_plan" in {issue.code for issue in result.errors}

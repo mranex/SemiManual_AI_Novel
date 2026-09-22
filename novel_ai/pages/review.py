@@ -21,7 +21,7 @@ from typing import Any
 
 from novel_ai.core.models import ChapterStatus, ReviewReportPayload, RewriteSectionRequest
 from novel_ai.services import ServiceError, reconcile, reviewer, writer
-from novel_ai.ui import page_header, set_action_result, show_action_result
+from novel_ai.ui import generation, page_header, set_action_result, show_action_result
 from novel_ai.ui.layout import AppContext
 
 from . import _chapter_ui, _common
@@ -55,11 +55,13 @@ KEY_RELOAD_PROSE = "novel_ai_review_reload_prose"
 KEY_AI_FOCUS = "novel_ai_review_ai_focus"
 KEY_AI_ATTEMPT = "novel_ai_review_ai_attempt"
 KEY_AI_RUN = "novel_ai_review_ai_run"
+KEY_AI_STREAM = "novel_ai_review_ai_stream"
 KEY_SELECTED_TEXT = "novel_ai_review_selected_text"
 KEY_REWRITE_INSTRUCTION = "novel_ai_review_rewrite_instruction"
 KEY_REWRITE_CONSTRAINTS = "novel_ai_review_rewrite_constraints"
 KEY_REWRITE_ATTEMPT = "novel_ai_review_rewrite_attempt"
 KEY_REWRITE_RUN = "novel_ai_review_rewrite_run"
+KEY_REWRITE_STREAM = "novel_ai_review_rewrite_stream"
 KEY_REPLACEMENT = "novel_ai_review_replacement"
 KEY_APPLY_REWRITE = "novel_ai_review_apply_rewrite"
 KEY_HUMAN_NOTES = "novel_ai_review_human_notes"
@@ -105,8 +107,32 @@ def render(ctx: AppContext) -> None:
         return
 
     _render_prose_panel(ctx, chapter_id)
-    _render_ai_review_panel(ctx, chapter_id)
-    _render_rewrite_panel(ctx, chapter_id)
+    ai_scoped = generation.scope_key(
+        project_id=project.config.project_id,
+        workspace="review",
+        artifact_id=f"review_report_{chapter_id}",
+    )
+    ai_surface = generation.start_surface(
+        ai_scoped,
+        transcript=generation.load_transcript(ai_scoped),
+        project=project,
+        chapter_id=chapter_id,
+        title="AI Generation — AI Review",
+    )
+    rewrite_scoped = generation.scope_key(
+        project_id=project.config.project_id,
+        workspace="review",
+        artifact_id=f"rewrite_{chapter_id}",
+    )
+    rewrite_surface = generation.start_surface(
+        rewrite_scoped,
+        transcript=generation.load_transcript(rewrite_scoped),
+        project=project,
+        chapter_id=chapter_id,
+        title="AI Generation — Rewrite Section",
+    )
+    _render_ai_review_panel(ctx, chapter_id, surface=ai_surface)
+    _render_rewrite_panel(ctx, chapter_id, surface=rewrite_surface)
     _render_human_review_panel(ctx, chapter_id)
     _render_finalize_panel(ctx, chapter_id)
 
@@ -237,12 +263,16 @@ def _render_prose_panel(ctx: AppContext, chapter_id: str) -> None:
     if st.button("Nạp lại editor từ prose hiện tại", key=KEY_RELOAD_PROSE):
         _common.clear_session_keys(key, f"{key}__source")
         st.rerun()
-    current = _common.sync_text_editor(key, text, version=version)
-    edited = st.text_area(
-        "Prose (markdown) — Save tạo prose revision mới và làm Human Review cũ mất hiệu lực",
-        value=current,
-        height=320,
-        key=key,
+    st.caption(
+        f"Prose revision hiện tại: **r{draft.revision}** · "
+        f"{'complete' if draft.is_complete else 'partial'} · Human Review cũ (nếu có) chỉ "
+        "còn hiệu lực cho revision này."
+    )
+    edited = _common.render_prose_editor(
+        key,
+        text,
+        version=version,
+        label="Prose (markdown) — Save tạo prose revision mới và làm Human Review cũ mất hiệu lực",
     )
     if not st.button("Lưu prose đã sửa (Save Draft)", key=KEY_PROSE_SAVE):
         return
@@ -277,7 +307,9 @@ def _render_prose_panel(ctx: AppContext, chapter_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _render_ai_review_panel(ctx: AppContext, chapter_id: str) -> None:
+def _render_ai_review_panel(
+    ctx: AppContext, chapter_id: str, *, surface: generation.GenerationSurface
+) -> None:
     import streamlit as st
 
     project = ctx.project
@@ -289,6 +321,14 @@ def _render_ai_review_panel(ctx: AppContext, chapter_id: str) -> None:
     )
     focus = st.text_input("Trọng tâm review (tuỳ chọn)", key=KEY_AI_FOCUS)
     attempt = _chapter_ui.attempt_input(KEY_AI_ATTEMPT)
+    can_stream = _chapter_ui.stream_supported(ctx.llm_client)
+    stream = st.checkbox(
+        "Stream (hiện raw JSON theo từng delta)",
+        value=bool(can_stream),
+        key=KEY_AI_STREAM,
+        disabled=not can_stream,
+        help="Report chỉ được parse/validate sau khi stream hoàn tất.",
+    )
 
     if ctx.llm_client is None or ctx.registry is None:
         st.error(
@@ -299,6 +339,17 @@ def _render_ai_review_panel(ctx: AppContext, chapter_id: str) -> None:
         )
     elif st.button("Chạy AI Review", key=KEY_AI_RUN):
         intent = (chapter_id, str(focus or "").strip(), int(attempt))
+        operation_id = _chapter_ui.stable_operation_id("review", "ai_review", *intent)
+        transcript, on_event = generation.recorder_for(
+            surface,
+            action="review.ai_review",
+            operation_id=operation_id,
+            stream=bool(stream),
+            attempt=int(attempt),
+            artifact_id=f"review_report_{chapter_id}",
+            chapter_id=chapter_id,
+            project=project,
+        )
         try:
             blocked, result = _chapter_ui.run_action(
                 KEY_AI_RUN,
@@ -309,7 +360,10 @@ def _render_ai_review_panel(ctx: AppContext, chapter_id: str) -> None:
                     client=ctx.llm_client,
                     chapter_id=chapter_id,
                     review_focus=str(focus or "").strip(),
-                    operation_id=_chapter_ui.stable_operation_id("review", "ai_review", *intent),
+                    operation_id=operation_id,
+                    on_event=on_event,
+                    stream=bool(stream),
+                    attempt=int(attempt),
                 ),
             )
         except ServiceError as error:
@@ -320,7 +374,9 @@ def _render_ai_review_panel(ctx: AppContext, chapter_id: str) -> None:
                     "được. Thử lại nếu muốn report."
                 ),
             )
+            surface.render(transcript, project=project, chapter_id=chapter_id)
         else:
+            surface.render(transcript, project=project, chapter_id=chapter_id)
             if blocked:
                 return
             set_action_result(result)
@@ -383,7 +439,9 @@ def _render_stored_report(project: Any, chapter_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _render_rewrite_panel(ctx: AppContext, chapter_id: str) -> None:
+def _render_rewrite_panel(
+    ctx: AppContext, chapter_id: str, *, surface: generation.GenerationSurface
+) -> None:
     import streamlit as st
 
     project = ctx.project
@@ -407,6 +465,14 @@ def _render_rewrite_panel(ctx: AppContext, chapter_id: str) -> None:
         "Ràng buộc thêm (mỗi dòng một mục, tuỳ chọn)", key=KEY_REWRITE_CONSTRAINTS, height=80
     )
     attempt = _chapter_ui.attempt_input(KEY_REWRITE_ATTEMPT)
+    can_stream = _chapter_ui.stream_supported(ctx.llm_client)
+    stream = st.checkbox(
+        "Stream (hiện raw JSON theo từng delta)",
+        value=bool(can_stream),
+        key=KEY_REWRITE_STREAM,
+        disabled=not can_stream,
+        help="Candidate chỉ được parse/validate sau khi stream hoàn tất; apply vẫn là action riêng.",
+    )
 
     if ctx.llm_client is None or ctx.registry is None:
         st.error("Chưa dùng được Rewrite: thiếu prompt registry hoặc LLM client.")
@@ -422,32 +488,47 @@ def _render_rewrite_panel(ctx: AppContext, chapter_id: str) -> None:
                 if line.strip()
             ],
         )
+        intent = (
+            chapter_id,
+            draft.revision,
+            request.selected_text or "",
+            request.instruction,
+            tuple(request.constraints),
+            int(attempt),
+        )
+        operation_id = _chapter_ui.stable_operation_id(
+            "review",
+            "rewrite",
+            chapter_id,
+            draft.revision,
+            request.selected_text or "",
+            request.instruction,
+            request.constraints,
+            attempt,
+        )
+        transcript, on_event = generation.recorder_for(
+            surface,
+            action="review.rewrite_section",
+            operation_id=operation_id,
+            stream=bool(stream),
+            attempt=int(attempt),
+            artifact_id=f"rewrite_{chapter_id}",
+            chapter_id=chapter_id,
+            project=project,
+        )
         try:
             blocked, result = _chapter_ui.run_action(
                 KEY_REWRITE_RUN,
-                intent=(
-                    chapter_id,
-                    draft.revision,
-                    request.selected_text or "",
-                    request.instruction,
-                    tuple(request.constraints),
-                    int(attempt),
-                ),
+                intent=intent,
                 project=project,
                 call=lambda: reviewer.rewrite_section(
                     project,
                     client=ctx.llm_client,
                     request=request,
-                    operation_id=_chapter_ui.stable_operation_id(
-                        "review",
-                        "rewrite",
-                        chapter_id,
-                        draft.revision,
-                        request.selected_text or "",
-                        request.instruction,
-                        request.constraints,
-                        attempt,
-                    ),
+                    operation_id=operation_id,
+                    on_event=on_event,
+                    stream=bool(stream),
+                    attempt=int(attempt),
                 ),
                 remember=True,
             )
@@ -459,7 +540,9 @@ def _render_rewrite_panel(ctx: AppContext, chapter_id: str) -> None:
                     "trong revision đang hiển thị rồi chạy lại."
                 ),
             )
+            surface.render(transcript, project=project, chapter_id=chapter_id)
         else:
+            surface.render(transcript, project=project, chapter_id=chapter_id)
             if blocked:
                 return
             st.session_state[REWRITE_CANDIDATE_KEY] = {
@@ -503,10 +586,10 @@ def _render_rewrite_candidate(ctx: AppContext, chapter_id: str) -> None:
         candidate.get("prose_revision"),
         _chapter_ui.payload_fingerprint(candidate.get("replacement_markdown")),
     )
-    text = _common.sync_text_editor(
+    _common.sync_text_editor(
         key, str(candidate.get("replacement_markdown") or ""), version=version
     )
-    edited = st.text_area("Replacement (có thể sửa trước khi apply)", value=text, height=200, key=key)
+    edited = st.text_area("Replacement (có thể sửa trước khi apply)", height=200, key=key)
     apply_col, discard_col = st.columns(2)
     with apply_col:
         apply_clicked = st.button("Apply rewrite vào prose", key=KEY_APPLY_REWRITE)

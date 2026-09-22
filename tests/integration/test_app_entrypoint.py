@@ -26,8 +26,12 @@ from streamlit.testing.v1 import AppTest
 
 from novel_ai.core import storage
 from novel_ai.core.llm import FakeLLMClient
+from novel_ai.core.models import OperationStatus
 from novel_ai.core.project import Project, slugify
+from novel_ai.ui import arbiter as arbiter_ui
 from novel_ai.ui import layout
+
+import t27_support
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_PATH = REPO_ROOT / "novel_ai" / "app.py"
@@ -129,6 +133,16 @@ def test_create_project_through_ui_writes_project_json_and_renders(
     assert (app_projects_root / slugify(TITLE) / "project.json").is_file()
 
 
+def _open_arbiter_panel(at: AppTest) -> None:
+    """Mở panel Arbiter bằng control compact ở toolbar (T32).
+
+    Panel mặc định đóng để workspace rộng; chi tiết (status rows + suggestion +
+    nút điều hướng) chỉ render khi user mở.
+    """
+    at.button(key=layout.KEY_ARBITER_TOGGLE).click()
+    at.run(timeout=60)
+
+
 def test_status_bar_and_arbiter_show_next_step_for_missing_base_idea(
     app_projects_root: Path,
 ) -> None:
@@ -145,22 +159,28 @@ def test_status_bar_and_arbiter_show_next_step_for_missing_base_idea(
     assert "chưa có prose revision" in footer
     assert "chưa có chapter đang làm" in footer
     assert "openai compatible" in footer.lower()
-    # Pane Arbiter: chưa có Base Idea -> gợi ý chốt Base Idea, và nói rõ blocking.
-    arbiter_text = _all_text(at.markdown, at.caption)
-    assert "Chốt Base Idea" in arbiter_text
-    assert "Bước gợi ý: Chốt Base Idea" in arbiter_text
-    assert "blocking" in arbiter_text
-    # Trạng thái từng tầng hiển thị dạng bảng trong pane Arbiter (spec mục 29).
-    assert "Base Idea — chưa có" in arbiter_text
-    assert "Timeline —" in arbiter_text
-    # Project id cũng hiển thị ở pane trái (PROJECT), không chỉ ở status bar.
+    # Dù panel đóng, next step + mức độ blocking vẫn phải nhìn thấy ở main (D018).
+    main_text = _all_text(at.markdown, at.caption)
+    assert "Bước gợi ý: Chốt Base Idea" in main_text
+    assert "blocking" in main_text
+    assert "1 blocker" in " ".join(button.label for button in at.button)
+    # Project id hiển thị trong drawer trái (PROJECT), không chỉ ở status bar.
     assert project.config.project_id in captions
 
+    _open_arbiter_panel(at)
 
-def test_shell_layout_has_top_nav_three_panes_and_bottom_status_bar(
+    assert not at.exception
+    detail_text = _all_text(at.markdown, at.caption)
+    # Trạng thái từng tầng hiển thị dạng bảng trong panel Arbiter (spec mục 29).
+    assert "Base Idea — chưa có" in detail_text
+    assert "Timeline —" in detail_text
+    assert "Chốt Base Idea" in detail_text
+
+
+def test_shell_layout_has_top_nav_project_drawer_and_compact_arbiter(
     app_projects_root: Path,
 ) -> None:
-    """Bố cục spec mục 28: nav trên, 3 pane giữa, status bar ở đáy."""
+    """D018: nav trên, Project trong sidebar, Arbiter compact, status bar ở đáy."""
     project = Project.create(app_projects_root, TITLE)
 
     at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
@@ -171,15 +191,81 @@ def test_shell_layout_has_top_nav_three_panes_and_bottom_status_bar(
     assert nav.proto.horizontal is True
     assert list(nav.options) == layout.nav_labels()
     assert [radio.key for radio in at.sidebar.radio] == []
-    # Ba pane giữa trang: PROJECT | CURRENT WORKSPACE | ARBITER.
-    markdown = _all_text(at.markdown)
-    for title in ("Project", "Current workspace", "Arbiter"):
-        assert f'class="dsh-pane-title">{title}</div>' in markdown
+    # Vai trò vẫn còn: PROJECT nằm trong drawer trái, CURRENT WORKSPACE ở main.
+    sidebar_text = _all_text(at.sidebar.markdown, at.sidebar.caption)
+    assert 'class="dsh-pane-title">Project</div>' in sidebar_text
+    assert "**Base Idea**" in sidebar_text, "cây project phải nằm trong drawer trái"
+    main_text = _all_text(at.markdown)
+    assert 'class="dsh-pane-title">Current workspace</div>' in main_text
+    # Panel Arbiter đóng mặc định: chỉ còn control compact, không có cột detail.
+    assert 'class="dsh-pane-title">Arbiter</div>' not in main_text
+    assert layout.KEY_ARBITER_TOGGLE in _button_keys(at)
+    assert "Arbiter ·" in " ".join(button.label for button in at.button)
     # Status bar ghim ở đáy bằng chính class của shell.
     footer = _footer_text(at)
     assert "API —" in footer
     assert "OpenAI Compatible" in footer
     assert "Context:" in footer
+
+    _open_arbiter_panel(at)
+
+    assert not at.exception
+    assert 'class="dsh-pane-title">Arbiter</div>' in _all_text(at.markdown)
+
+
+def test_arbiter_panel_toggle_keeps_state_and_writes_nothing(
+    app_projects_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T32: mở/đóng panel không ghi project, không gọi LLM, không mất node đang chọn."""
+    project = t27_support.seed_project_with_accepted_short_plan(
+        app_projects_root, chapters=2
+    )
+    client = FakeLLMClient()
+    monkeypatch.setattr(
+        layout, "build_llm_client", lambda *_args, **_kwargs: (client, None)
+    )
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+    project_root = app_projects_root / project.slug
+    at.selectbox(key=f"{layout.KEY_TREE_NODE}_selection").set_value("skeleton_ch_0001")
+    at.run(timeout=60)
+    assert at.session_state[layout.KEY_TREE_NODE] == "skeleton_ch_0001"
+
+    before = _fingerprint_tree(project_root)
+    at.button(key=layout.KEY_ARBITER_TOGGLE).click()
+    at.run(timeout=60)
+    assert at.session_state[layout.KEY_ARBITER_OPEN] is True
+    assert "Skeleton · Ch.1 Chương 1" in " ".join(
+        option for option in at.selectbox(key=f"{layout.KEY_TREE_NODE}_selection").options
+    )
+    at.button(key=layout.KEY_ARBITER_TOGGLE).click()
+    at.run(timeout=60)
+
+    assert at.session_state[layout.KEY_ARBITER_OPEN] is False
+    assert at.session_state[layout.KEY_TREE_NODE] == "skeleton_ch_0001"
+    assert _fingerprint_tree(project_root) == before
+    assert client.calls == []
+
+
+def test_blocking_notices_visible_when_drawer_and_arbiter_closed(
+    app_projects_root: Path,
+) -> None:
+    """Cảnh báo recovery/read-only/stale vẫn thấy ở main dù hai panel đóng (D018)."""
+    project = Project.create(app_projects_root, TITLE)
+    _seed_pending_operation(
+        project,
+        operation_id="op_notice",
+        status=OperationStatus.committing,
+        entries=[],
+    )
+
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+
+    assert not at.exception
+    # Panel Arbiter đóng mặc định: detail không render, nhưng cảnh báo vẫn ở main.
+    assert 'class="dsh-pane-title">Arbiter</div>' not in _all_text(at.markdown)
+    warnings = _all_text(at.warning)
+    assert "transaction dở" in warnings
+    assert "Bước gợi ý:" in _all_text(at.caption)
 
 
 def test_tree_pane_renders_artifact_tree_without_radio(
@@ -428,3 +514,329 @@ def _seed_pending_operation(
     storage.write_json_atomic(
         pending_dir / "manifest.json", manifest, operation_id=f"{operation_id}.pending"
     )
+
+
+# ---------------------------------------------------------------------------
+# BUG-001 — project tree không được lồng expander (T27)
+# ---------------------------------------------------------------------------
+
+
+def _open_workspace(at: AppTest, workspace: str) -> None:
+    at.radio(key=layout.KEY_WORKSPACE_NAV).set_value(layout.label_for_workspace(workspace))
+    at.run(timeout=60)
+
+
+def _tree_markdown(at: AppTest) -> str:
+    return _all_text(at.markdown)
+
+
+def test_project_tree_renders_one_chapter_without_nested_expander(
+    app_projects_root: Path,
+) -> None:
+    """BUG-001: project có đúng một chapter phải render được qua entrypoint thật.
+
+    Trước fix, nhánh `Chapters` mở expander rồi từng chapter (có Skeleton và
+    Reconciliation) mở expander thứ hai, Streamlit raise
+    `Expanders may not be nested inside other expanders.` và sập toàn shell.
+    """
+    project = t27_support.seed_project_with_accepted_short_plan(
+        app_projects_root, chapters=1
+    )
+    assert t27_support.chapter_ids(project) == ["ch_0001"]
+
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+
+    assert not at.exception, "project tree crash khi project có một chapter"
+    markdown = _tree_markdown(at)
+    assert "**Ch.1 Chương 1**" in markdown
+    assert "**Skeleton**" in markdown
+    assert "**Reconciliation**" in markdown
+
+
+def test_project_tree_renders_many_chapters_without_nested_expander(
+    app_projects_root: Path,
+) -> None:
+    """BUG-001 với nhiều chapter: đủ Chapter/Skeleton/Reconciliation, không exception."""
+    project = t27_support.seed_project_with_accepted_short_plan(
+        app_projects_root, chapters=3
+    )
+    chapter_ids = t27_support.chapter_ids(project)
+    assert chapter_ids == ["ch_0001", "ch_0002", "ch_0003"]
+
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+
+    assert not at.exception, "project tree crash khi project có nhiều chapter"
+    markdown = _tree_markdown(at)
+    for number in (1, 2, 3):
+        assert f"**Ch.{number} Chương {number}**" in markdown
+    assert markdown.count("**Skeleton**") == 3
+    assert markdown.count("**Reconciliation**") == 3
+    # Cây chỉ còn một tầng expander: nhóm `Chapters` không lồng trong nhóm khác.
+    assert "Chapters (3)" in [element.label for element in at.expander]
+
+
+def test_project_tree_selection_still_reaches_skeleton_and_reconciliation(
+    app_projects_root: Path,
+) -> None:
+    """Sau fix vẫn chọn được chapter, Skeleton và Reconciliation trong pane trái."""
+    project = t27_support.seed_project_with_accepted_short_plan(
+        app_projects_root, chapters=2
+    )
+
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+
+    assert not at.exception
+    selectbox = at.selectbox(key=f"{layout.KEY_TREE_NODE}_selection")
+    options = list(selectbox.options)
+    assert any("Ch.1 Chương 1" in option for option in options)
+    assert sum("Skeleton" in option for option in options) == 2
+    assert sum("Reconciliation" in option for option in options) == 2
+
+    at.selectbox(key=f"{layout.KEY_TREE_NODE}_selection").set_value("skeleton_ch_0001")
+    at.run(timeout=60)
+
+    assert not at.exception
+    assert at.session_state[layout.KEY_TREE_NODE] == "skeleton_ch_0001"
+    assert "Đang xem:" in _all_text(at.caption)
+
+
+def _short_plan_generate_button_key(at: AppTest) -> str:
+    keys = [
+        key
+        for key in _button_keys(at)
+        if key.startswith("FormSubmitter:novel_ai_short_plan_generate_")
+    ]
+    assert keys, "không thấy nút generate Short Plan trong shell"
+    return keys[0]
+
+
+def _fill_writing_constraints(at: AppTest) -> None:
+    """Điền `pov`/`length_guidance` cho mọi chapter được giao (contract viết)."""
+    filled = 0
+    for widget in at.text_input:
+        key = widget.key or ""
+        if key.endswith("_pov"):
+            widget.set_value("ngôi ba giới hạn theo Sở Dương")
+            filled += 1
+        elif key.endswith("_length_guidance"):
+            widget.set_value("1500–2000 từ")
+    assert filled, "không thấy ô nhập `pov` của chapter được giao"
+
+
+def _accept_short_plan_through_shell(
+    app_projects_root: Path, monkeypatch: pytest.MonkeyPatch, *, chapters: int
+) -> tuple[Project, AppTest, FakeLLMClient]:
+    """Generate rồi Accept Short Plan bằng nút thật trong shell (BUG-001 trigger).
+
+    `build_llm_client` bị thay bằng **một** `FakeLLMClient` scripted nên không có
+    request mạng, và đếm được chính xác số lần gọi LLM; phần còn lại đi đúng đường
+    thật: page → service → transaction ghi `chapter.json` → `st.rerun()` → shell
+    render lại project tree có chapter.
+    """
+    project = t27_support.seed_project_with_accepted_short_plan(
+        app_projects_root, chapters=chapters, short_plan="none"
+    )
+    client = FakeLLMClient([t27_support.short_plan_response(project)])
+    monkeypatch.setattr(
+        layout, "build_llm_client", lambda *_args, **_kwargs: (client, None)
+    )
+
+    at = _new_app(
+        **{
+            layout.KEY_OPEN_PROJECT: project.slug,
+            layout.KEY_WORKSPACE: "short_plan",
+            layout.KEY_WORKSPACE_NAV: layout.label_for_workspace("short_plan"),
+        }
+    )
+    assert not at.exception
+    _fill_writing_constraints(at)
+    at.button(key=_short_plan_generate_button_key(at)).click()
+    at.run(timeout=60)
+    assert not at.exception
+    assert "novel_ai_short_plan_accept" in _button_keys(at), (
+        "generate phải tạo candidate để bấm Accept"
+    )
+
+    at.button(key="novel_ai_short_plan_accept").click()
+    at.run(timeout=60)
+    return project, at, client
+
+
+def test_accept_short_plan_in_full_shell_reruns_and_reopens_without_crash(
+    app_projects_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Trigger thật của BUG-001: Accept Short Plan trong shell → rerun → reopen."""
+    project, at, client = _accept_short_plan_through_shell(
+        app_projects_root, monkeypatch, chapters=2
+    )
+
+    assert not at.exception, "shell crash ngay sau Accept Short Plan"
+    chapter_ids = t27_support.chapter_ids(project)
+    assert chapter_ids == ["ch_0001", "ch_0002"]
+    project_root = app_projects_root / project.slug
+    after_accept = _fingerprint_tree(project_root)
+
+    # Rerun thuần sau accept: render lại cây có chapter, không ghi thêm file.
+    at.run(timeout=60)
+    assert not at.exception
+    assert _fingerprint_tree(project_root) == after_accept
+
+    # "Restart": AppTest mới hoàn toàn trên cùng project đã có chapter.
+    reopened = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+    assert not reopened.exception
+    assert "**Ch.1 Chương 1**" in _tree_markdown(reopened)
+    assert _fingerprint_tree(project_root) == after_accept
+    # Chỉ đúng một LLM call: lần bấm generate. Rerun/render không phát request nào.
+    assert len(client.calls) == 1
+
+
+def test_accept_short_plan_keeps_metadata_pins_and_previous_chapter(
+    app_projects_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Accept tạo đúng metadata/pin/previous chapter; rerun và reopen giữ nguyên."""
+    project, at, _client = _accept_short_plan_through_shell(
+        app_projects_root, monkeypatch, chapters=2
+    )
+    assert not at.exception
+
+    first = storage.load_chapter(project, "ch_0001")
+    second = storage.load_chapter(project, "ch_0002")
+    assert first is not None and second is not None
+    assert first.status.value == "planned"
+    assert first.previous_chapter_id is None
+    assert second.previous_chapter_id == "ch_0001"
+    assert first.short_plan_pin is not None
+    assert first.short_plan_pin.revision == 1
+
+    at.run(timeout=60)
+    reopened = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+    assert not reopened.exception
+    again_first = storage.load_chapter(project, "ch_0001")
+    assert again_first is not None
+    assert again_first.model_dump(mode="json") == first.model_dump(mode="json")
+
+
+def test_project_without_chapter_still_renders_tree(
+    app_projects_root: Path,
+) -> None:
+    """Nhánh còn lại của BUG-001: project chưa có chapter vẫn render như trước."""
+    project = Project.create(app_projects_root, TITLE)
+
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+
+    assert not at.exception
+    markdown = _tree_markdown(at)
+    assert "**Chapters**" in markdown
+    assert "**Skeleton**" not in markdown
+    tree_expanders = [element.label for element in at.expander]
+    assert "Foundation (4)" in tree_expanders
+    assert "Plans (2)" in tree_expanders
+
+
+# ---------------------------------------------------------------------------
+# BUG-002 — nút điều hướng Arbiter (T28)
+# ---------------------------------------------------------------------------
+
+
+def _arbiter_button_key(index: int, code: str) -> str:
+    return f"novel_ai_arbiter_open_{index}_{code}"
+
+
+def _assert_navigated(at: AppTest, workspace: str, *, page_marker: str | None = None) -> None:
+    """Navbar radio, workspace id và caption của shell phải khớp cùng một workspace."""
+    assert at.session_state[layout.KEY_WORKSPACE] == workspace
+    assert at.session_state[layout.KEY_WORKSPACE_NAV] == layout.label_for_workspace(workspace)
+    assert at.radio(key=layout.KEY_WORKSPACE_NAV).value == layout.label_for_workspace(workspace)
+    assert f"`{workspace}`" in _all_text(at.caption)
+    if page_marker is not None:
+        assert page_marker in _all_text(at.subheader)
+
+
+def test_arbiter_button_switches_workspace_navbar_and_page(
+    app_projects_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-002: click nút `Chuyển tới …` thật phải đổi navbar, page và giữ nguyên state."""
+    project = t27_support.seed_project_with_accepted_short_plan(
+        app_projects_root, chapters=2
+    )
+    report = arbiter_ui.analyze(project)
+    target = report.suggestions[0]
+    assert target.workspace == "skeleton", "fixture phải gợi ý sang workspace chapter"
+
+    client = FakeLLMClient()
+    monkeypatch.setattr(
+        layout, "build_llm_client", lambda *_args, **_kwargs: (client, None)
+    )
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+    assert at.session_state[layout.KEY_WORKSPACE] == "co_create"
+    project_root = app_projects_root / project.slug
+    before = _fingerprint_tree(project_root)
+    _open_arbiter_panel(at)
+
+    button = at.button(key=_arbiter_button_key(0, target.code))
+    assert not button.disabled, "điều hướng chỉ để xem nên không bị chặn vì thiếu LLM"
+    button.click()
+    at.run(timeout=60)
+
+    assert not at.exception, "click nút Arbiter không được raise widget-state exception"
+    _assert_navigated(at, target.workspace, page_marker="Skeleton")
+
+    # Rerun thêm hai lần: lựa chọn không bị bật lại về workspace cũ và không loop.
+    at.run(timeout=60)
+    at.run(timeout=60)
+    assert not at.exception
+    _assert_navigated(at, target.workspace)
+
+    # Điều hướng là render thuần: không mutation project và không gọi LLM.
+    assert client.calls == []
+    assert _fingerprint_tree(project_root) == before
+
+
+def test_arbiter_navigation_works_without_llm_client(
+    app_projects_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Điều hướng không bị chặn khi chưa dựng được LLM client (chỉ xem workspace)."""
+    project = t27_support.seed_project_with_accepted_short_plan(
+        app_projects_root, chapters=2
+    )
+    target = arbiter_ui.analyze(project).suggestions[0]
+    monkeypatch.setattr(
+        layout,
+        "build_llm_client",
+        lambda *_args, **_kwargs: (None, "Thiếu NOVEL_AI_API_BASE_URL."),
+    )
+
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+    _open_arbiter_panel(at)
+    button = at.button(key=_arbiter_button_key(0, target.code))
+    assert not button.disabled
+    button.click()
+    at.run(timeout=60)
+
+    assert not at.exception
+    _assert_navigated(at, target.workspace)
+    assert "Chưa dựng được LLM client" in _all_text(at.caption)
+
+
+def test_arbiter_navigation_reaches_recovery_workspace(
+    app_projects_root: Path,
+) -> None:
+    """Gợi ý recovery trỏ sang workspace Revision và điều hướng tới đó được."""
+    project = Project.create(app_projects_root, TITLE)
+    _seed_pending_operation(
+        project,
+        operation_id="op_nav_recovery",
+        status=OperationStatus.committing,
+        entries=[],
+    )
+    target = arbiter_ui.analyze(project).suggestions[0]
+    assert target.workspace == "revision"
+
+    at = _new_app(**{layout.KEY_OPEN_PROJECT: project.slug})
+    _open_arbiter_panel(at)
+
+    at.button(key=_arbiter_button_key(0, target.code)).click()
+    at.run(timeout=60)
+
+    assert not at.exception
+    _assert_navigated(at, "revision")

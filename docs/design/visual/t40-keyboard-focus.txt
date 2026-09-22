@@ -1,0 +1,63 @@
+Kết quả check_keyboard_focus.py (T32 tiêu chí 4 / T40 nghiệm thu)
+Ngày: 2026-09-22 · Windows 11 · Edge 153.0.4234.48 headless · Python 3.12.9
+Lệnh: .\.venv\Scripts\python.exe docs\design\examples\check_keyboard_focus.py
+App thật (shell hiện tại) + project demo trong thư mục tạm; không đụng projects/ thật.
+==============================================================================
+
+--- thứ tự Tab (45 bước) ---
+ 1. BUTTON[stBaseButton-headerNoPadding]: 
+ 2. BUTTON/button[stTab]: Tạo project
+ 3. INPUT/text: 
+ 4. INPUT/text: 
+ 5. INPUT/text: 
+ 6. INPUT/text: 
+ 7. BUTTON[stBaseButton-secondaryFormSubmit]: Tạo project
+ 8. SUMMARY: Foundation (4)
+ 9. SUMMARY: Plans (2)
+10. SUMMARY: Chapters (3)
+11. INPUT: 
+12. BUTTON[stBaseButton-secondary]: Kiểm tra kết nối
+13. SECTION[stMain]: header[data-testid="stHeader"] { d
+14. INPUT/radio: 
+15. BUTTON[stBaseButton-secondary]: ▸ Arbiter · 1 blocker
+16. INPUT: 
+17. INPUT/number[stNumberInputField]: 
+18. INPUT/number[stNumberInputField]: 
+19. TEXTAREA/textarea: 
+20. INPUT/number[stNumberInputField]: 
+21. INPUT/checkbox: 
+22. BUTTON[stBaseButton-secondaryFormSubmit]: Chạy generate/regenerate
+23. INPUT/number[stNumberInputField]: 
+24. INPUT/number[stNumberInputField]: 
+25. BUTTON[stBaseButton-secondaryFormSubmit]: Xác nhận horizon cho accepted revi
+26. BODY: You need to enable JavaScript to r
+27. BUTTON[stBaseButton-headerNoPadding]: 
+28. BUTTON/button[stTab]: Tạo project
+29. INPUT/text: 
+30. INPUT/text: 
+31. INPUT/text: 
+32. INPUT/text: 
+33. BUTTON[stBaseButton-secondaryFormSubmit]: Tạo project
+34. SUMMARY: Foundation (4)
+35. SUMMARY: Plans (2)
+36. SUMMARY: Chapters (3)
+37. INPUT: 
+38. BUTTON[stBaseButton-secondary]: Kiểm tra kết nối
+39. SECTION[stMain]: header[data-testid="stHeader"] { d
+40. INPUT/radio: 
+41. BUTTON[stBaseButton-secondary]: ▸ Arbiter · 1 blocker
+42. INPUT: 
+43. INPUT/number[stNumberInputField]: 
+44. INPUT/number[stNumberInputField]: 
+45. TEXTAREA/textarea: 
+
+Tab đầu tiên: {'tag': 'BUTTON', 'type': '', 'testid': 'stBaseButton-headerNoPadding', 'text': ''}
+sidebar width: 336 -> 0 (Enter)
+
+Tab tới nút Arbiter ở bước 15; Enter…
+arbiter rows: 0 -> 12 (Enter)
+workspace: long_plan -> skeleton (Enter trên nút Chuyển tới)
+workspace (radio + ArrowDown): long_plan -> short_plan
+
+=== KẾT QUẢ ===
+PASS: keyboard/focus dùng được — Tab phủ nav/drawer/Arbiter/form, Enter thu gọn sidebar, Enter mở Arbiter, Enter trên 'Chuyển tới …' đổi workspace, ArrowDown trên nav radio đổi workspace.

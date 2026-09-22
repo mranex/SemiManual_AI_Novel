@@ -1,6 +1,6 @@
 # Schema và data contract
 
-Phiên bản: 2026-09-19. Phụ thuộc: `workflow.md`, `decisions.md`, `novel_ai_spec_v0.2.md`.
+Phiên bản: 2026-09-22 (T29 bổ sung mục 3.3, 3.4 và 11). Phụ thuộc: `workflow.md`, `decisions.md`, `novel_ai_spec_v0.2.md`.
 
 Tài liệu này là contract dữ liệu duy nhất cho prompt, service và UI ở MVP. Tên class/file Pydantic ở T08 có thể khác, nhưng hành vi, field bắt buộc và validation cross-field phải giữ theo tài liệu này.
 
@@ -10,8 +10,13 @@ Tài liệu này là contract dữ liệu duy nhất cho prompt, service và UI 
 
 - `project.schema_version` dùng giá trị `2`, theo spec v0.2.
 - Các document/artifact mới trong contract này dùng `schema_version: 1`.
+- **Amendment 2026-09-22 (T29):** D016/D017 chỉ thêm field **optional có default**, không đổi
+  kiểu hay ý nghĩa field đang có, nên `schema_version` giữ nguyên (`2` cho project, `1` cho
+  envelope). File cũ thiếu field mới đọc ra default (`""` hoặc `null`) và được phân loại
+  `legacy` theo mục 3.4; không cần migration tự động khi mở project.
 - App/backend sở hữu metadata, revision, lifecycle, dependency pins, stable ID, validation error và đường dẫn file.
 - LLM chỉ trả payload thuộc action đang chạy. LLM không được tự quyết định `status`, `revision`, `accepted_at`, `dependency_pins`, stable ID cuối cùng hoặc file path.
+- `planning_scope` (D017) là **metadata app-owned** trên `ArtifactRevision`, không phải field payload do LLM trả và không cho form sửa.
 - Nếu prompt cần ID ổn định, backend phải cấp ID trước hoặc map ID tạm từ LLM sang stable ID trong bước validate. Accepted data chỉ lưu stable ID do app quản lý.
 
 ### 1.2. Kiểu cơ bản
@@ -55,8 +60,14 @@ Mọi structured artifact dùng envelope sau. `payload` là phần do user/LLM/s
 | `created_at` | IsoDateTime | Có | Backend tạo | App | Thời điểm candidate/revision được tạo. |
 | `accepted_at` | IsoDateTime/null | Có | null | App | Chỉ set khi accepted. |
 | `accepted_by` | string/null | Có | null | App | MVP thường là `user` hoặc `auto_accept`. |
+| `planning_scope` | `PlanningScope`/null | Không | `null` | **App** | Horizon của revision (D017). Chỉ Long Plan dùng ở T30; artifact khác để `null`. Field thêm 2026-09-22 (T29), optional ⇒ file cũ đọc ra `null` = `legacy`. |
 
-`DependencyPin`: `artifact_id`, `revision`, `scope`, `chapter_id` optional. `scope` dùng các giá trị như `base_idea`, `premise`, `characters`, `world_rules`, `foreshadow`, `long_plan`, `short_plan`, `skeleton`, `timeline_as_of`, `relationship_as_of`, `prose_revision`.
+`PlanningScope` (D017): `{start: ChapterNumber, end: ChapterNumber}`, `start >= 1`,
+`end >= start`, đơn vị là số chương. Đây là **toàn horizon** mà candidate phải kiến trúc,
+không phải kích thước arc và không phải edit window. LLM không trả field này; service ghi khi
+tạo candidate và Accept giữ nguyên.
+
+`DependencyPin`: `artifact_id`, `revision`, `scope`, `chapter_id` optional. `scope` dùng các giá trị như `base_idea`, `premise`, `characters`, `world_rules`, `foreshadow`, `long_plan`, `short_plan`, `skeleton`, `timeline_as_of`, `relationship_as_of`, `prose_revision`. (Khác `ArtifactRevision.planning_scope`: `DependencyPin.scope` là *loại* phụ thuộc, không phải khoảng chương.)
 
 `ValidationResult`: `state` (`valid`, `invalid`, `not_checked`), `errors` array. Mỗi error có `path`, `code`, `message`, `severity`.
 
@@ -73,6 +84,8 @@ Mọi structured artifact dùng envelope sau. `payload` là phần do user/LLM/s
 | `genre_prompt_id` | string | Có | `custom` | ID prompt genre, không phải file tùy tiện do LLM chọn. |
 | `writing_style_id` | string | Có | `default` | Style dùng cho Writer. |
 | `current_chapter` | ChapterNumber | Có | `1` | Chapter đang làm việc; không thay thế lifecycle từng chapter. |
+| `default_pov` | string | Không | `""` | **D016**: POV mặc định do user nhập cho request Short Plan mới. Rỗng = chưa thiết lập (không phải default ngầm). |
+| `default_length_guidance` | string | Không | `""` | **D016**: độ dài mặc định do user nhập. Rỗng = chưa thiết lập; app không bịa số từ. |
 | `auto_accept_structured` | boolean | Có | `false` | Chỉ structured output sau validation. |
 | `allow_relationship_replan` | boolean | Có | `true` | Rolling Plan được đề xuất đổi future relationship direction. |
 | `rolling_plan_every` | integer >= 1 | Có | `3` | Chỉ tạo reminder. |
@@ -172,14 +185,36 @@ Mọi structured artifact dùng envelope sau. `payload` là phần do user/LLM/s
 
 | Field | Type | Required | Default | Ghi chú |
 |---|---|---:|---|---|
-| `volumes` | array `VolumePlan` | Có | — | Ít nhất 1 volume. |
+| `volumes` | array `VolumePlan` | Có | — | **Ít nhất 1 volume** (enforce ở validator, không chỉ ghi chú). Volume rỗng ⇒ lỗi `empty_long_plan`. |
 | `global_threads` | array object | Có | `[]` | Thread lớn, dùng ID nếu cần. |
 
-`VolumePlan`: `volume_id`, `title`, `theme`, `goal`, `arcs`.
+`VolumePlan`: `volume_id`, `title`, `theme`, `goal`, `arcs`. Mỗi volume có **ít nhất 1 arc**
+(`empty_volume`).
 
 `ArcPlan`: `arc_id`, `title`, `chapter_range` (`start`, `end`), `goal`, `core_conflict`, `start_state`, `end_state`, `major_reveals`, `character_ids`, `world_rule_ids`, `foreshadow_ids`, `relationship_directions`.
 
 `RelationshipDirection` trong plan: `relationship_id` optional, `character_ids` `[a,b]`, `arc_direction`, `target_state`, `notes`. Đây là future direction, không phải current relationship.
+
+**Invariant coverage theo horizon (D017, amendment T29).** `planning_scope` ở
+`ArtifactRevision.planning_scope`, không ở payload. Với `scope = {start, end}`:
+
+1. Mọi arc có `scope.start <= chapter_range.start <= chapter_range.end <= scope.end`
+   (vi phạm ⇒ `out_of_scope_arc`).
+2. Xét thứ tự arc theo thứ tự volume trong `volumes` rồi thứ tự arc trong volume: arc đầu
+   `chapter_range.start == scope.start` (⇒ `uncovered_scope_start`), arc cuối
+   `chapter_range.end == scope.end` (⇒ `uncovered_scope_end`), và
+   `arc[i+1].start == arc[i].end + 1` (⇒ `gap_in_scope` khi lớn hơn, `overlap` khi nhỏ hơn
+   hoặc bằng).
+3. `volumes == []` ⇒ `empty_long_plan`; volume không có arc ⇒ `empty_volume`.
+4. Uniqueness `volume_id`/`arc_id` và FK `character_ids`/`world_rule_ids`/`foreshadow_ids`
+   giữ theo validation hiện có.
+
+Coverage là **structural invariant**, không phải đánh giá chất lượng phân rã: một arc phủ đúng
+horizon vẫn hợp lệ về cấu trúc. Số volume/arc **không** có quota; backend không suy “đủ tốt” từ
+count. Khi cả plan chỉ có một arc, UI hiện warning non-blocking (mục 11.3) — warning này không
+phải validator và không đổi Auto Accept.
+
+`chapter_range` luôn là endpoint chương, không bao giờ là “số chương của arc”.
 
 ### 3.2. Short Plan payload
 
@@ -206,9 +241,56 @@ Mọi structured artifact dùng envelope sau. `payload` là phần do user/LLM/s
 | `chapter_goal` | string | Có | — | Mục tiêu plan. |
 | `planned_ending` | string | Không | `""` | Dự định kết. |
 
+### 3.3. Resolve và validate `planning_scope` theo action (D017)
+
+| Action | Nguồn `planning_scope` | Nếu thiếu/`null` |
+|---|---|---|
+| `generate` (Long Plan, tạo candidate mới) | **Input bắt buộc** từ user/form | `GuardError` `missing_planning_scope` — không suy `1..3`, không suy từ progress |
+| `regenerate` / `edit` | Input nếu user chủ động đổi; ngược lại `accepted_revision.planning_scope` | `GuardError` `missing_planning_scope` (legacy ⇒ xem mục 3.4) |
+| `accept` | `candidate_revision.planning_scope` | `GuardError` `missing_planning_scope`; không revalidate bằng `scope=None` |
+| Revalidate sau reload / snapshot | `candidate_revision.planning_scope` (và accepted khi cần) | Chỉ **đọc/xem**; không tự sinh scope |
+| Auto Accept structured | `candidate_revision.planning_scope` | Không auto accept; giữ candidate + báo lỗi |
+
+Scope đã ghi trên candidate **không** bị form ghi đè. Đổi horizon là action tường minh: tạo
+candidate mới với scope mới; accepted cũ giữ nguyên cho tới khi candidate mới được Accept.
+
+`ActionResult.data` vẫn trả `planning_scope` để UI hiển thị, nhưng **nguồn sự thật** là
+`ArtifactRevision.planning_scope`, không phải `ActionResult`.
+
+### 3.4. Compatibility matrix cho Long Plan legacy (D017)
+
+`legacy` = revision/candidate được tạo trước amendment T29, tức `planning_scope == null`.
+
+| Tình huống | Đọc/xem | Generate/Regenerate/Edit | Accept | Auto Accept | Ghi file khi chỉ mở |
+|---|---|---|---|---|---|
+| Accepted revision **có** scope | Bình thường | Dùng scope đã lưu | Revalidate theo scope | Theo config | Không |
+| Accepted revision **legacy** (không scope) | Được, UI gắn nhãn `legacy scope` | Chặn `missing_planning_scope` cho tới khi user xác nhận horizon | Chặn nếu candidate không có scope | Không auto accept | Không |
+| Candidate **có** scope | Được | Dùng scope của candidate/accepted | Revalidate theo scope | Theo config | Không |
+| Candidate **legacy** (không scope) | Được, gắn nhãn `legacy` | Chặn; user phải regenerate với scope tường minh | Chặn `missing_planning_scope` | Không | Không |
+
+Action xác nhận horizon (user chủ động): user nhập `{start, end}` cho accepted revision legacy,
+app **snapshot revision cũ trước** (storage mục 9) rồi ghi `planning_scope` vào accepted
+revision theo cơ chế app-owned của mục 3.3. Migration:
+
+- chỉ chạy khi user bấm action, **không** tự chạy khi mở project;
+- retry an toàn: chạy lại khi đã có scope ⇒ no-op, không nhân bản revision/snapshot;
+- không đổi payload `volumes`/`arcs`, không sửa manuscript, không đổi `short_plan`/chapter;
+- **không** lấy `min/max` arc hiện có làm horizon gốc đã xác nhận;
+- nếu user xác nhận scope hẹp hơn vùng arc đang có ⇒ validator coverage báo lỗi và accepted
+  giữ nguyên; user phải regenerate plan cho horizon đó.
+
 ## 4. Skeleton và projection
 
-Quy ước prompt T05: một item object trong `ChapterPlan.outline` mang `{language, pov, length_guidance}` (ba string không rỗng), các item còn lại mô tả beat. Đây là cách dùng type string/object hiện hữu, không thêm field top-level hoặc project config. Backend cấp yêu cầu viết trước Short Plan; Skeleton chuyển chúng thành `global_constraints` writer-safe. Khi thiếu yêu cầu, service yêu cầu bổ sung trước generate, không tự đoán POV/độ dài.
+Quy ước prompt T05: một item object trong `ChapterPlan.outline` mang `{language, pov, length_guidance}` (ba string không rỗng), các item còn lại mô tả beat. Đây là cách dùng type string/object hiện hữu, không thêm field top-level. Backend cấp yêu cầu viết trước Short Plan; Skeleton chuyển chúng thành `global_constraints` writer-safe. Khi thiếu yêu cầu, service yêu cầu bổ sung trước generate, không tự đoán POV/độ dài.
+
+**Amendment 2026-09-22 (D016).** Giá trị ba field trên là **giá trị hiệu lực**: override của
+chương nếu user nhập, ngược lại `default_pov`/`default_length_guidance`/`default_language` của
+`project.json`. Nguồn default **không** nằm trong payload plan (project config là nơi duy nhất);
+`ChapterPlan.outline` chỉ mang object contract đã resolve. Service kiểm đủ ba field cho **mọi**
+assigned chapter trước khi build context/gọi LLM; thiếu hoặc có ID thừa/trùng ⇒ `GuardError`
+(`missing_writing_contract`, `unknown_chapter_constraint`, `duplicate_chapter_constraint`) kèm
+`chapter_id` + field, không gọi LLM. Model không được thay contract đã cấp: giá trị khác trong
+output ⇒ `invalid_outline_contract_item`.
 
 `SkeletonPayload`: `chapter_id`, `chapter_number`, `sections`, `global_constraints`, `writer_context_policy`.
 
@@ -426,3 +508,79 @@ Không đổi top-level schema/spec. Manifest dùng aliases IdeaStateResponse (`
 - Impact source_change `{item_kind, item_id, from_revision, to_candidate_revision}`; risk_summary string; suggested_actions array string; severity cùng enum Review. Affected items chỉ nằm trong downstream input, reason nêu cơ sở và giới hạn; không thêm mutation fields.
 
 Input registry, Writer/Rewrite projection, reference selection và failure policy theo prompt-catalog mục 8. Models/loader/service ở T08/T10/T12/T15–T18 phải enforce; prompt không thay backend guard.
+
+## 11. Generation event và editor working copy (T29, 2026-09-22)
+
+Contract này thuộc D018/D019. Đây là **hình dạng dữ liệu và luật hành vi** cho T33–T39; T29
+không triển khai runtime và không khai đã có validator thực thi.
+
+### 11.1. `GenerationEvent`
+
+Dataclass/protocol thuần Python (không import Streamlit) trong `novel_ai/core`; service/adapter
+phát, page render.
+
+| Field | Type | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| `status` | enum | Có | Xem 11.2 |
+| `operation_id` | string | Có | Khóa idempotency theo `storage.md` mục 4 |
+| `action` | string | Có | Ví dụ `generate`, `regenerate`, `rewrite`, `reconcile` |
+| `prompt_id` | string/null | Không | Prompt registry id nếu có |
+| `artifact_id` | string/null | Không | Artifact đích |
+| `chapter_id` | string/null | Không | Chapter đích nếu có |
+| `text_delta` | string | Không, default `""` | Chỉ raw text tăng dần; **không** phải payload đã validate |
+| `attempt` | integer >= 1 | Có | Lần thử hiện tại của cùng `operation_id` |
+| `transport` | enum | Có | `streaming` \| `non_streaming` |
+| `detail` | string | Không, default `""` | Thông báo tiếng Việt an toàn để hiển thị |
+| `raw_ref` | string/null | Không | Đường dẫn raw/partial theo storage, nếu đã lưu |
+
+Bất biến: event **không** chứa API key, full prompt, author-only context hay future plot.
+
+### 11.2. State machine
+
+| State | Nghĩa | Chuyển tiếp hợp lệ |
+|---|---|---|
+| `idle` | Chưa chạy action trong phiên | → `connecting` |
+| `connecting` | Đã phát request, chưa có dữ liệu | → `streaming` \| `non_streaming` \| `error` |
+| `non_streaming` | Provider không stream; chờ response trọn | → `transport_complete` \| `error` |
+| `streaming` | Đang nhận `text_delta` | → `transport_complete` \| `partial` \| `error` |
+| `transport_complete` | Đã nhận xong response | → `validating` |
+| `validating` | Đang parse/validate/ghi (chưa có candidate complete) | → `saved` \| `partial` \| `invalid` \| `error` |
+| `saved` | Candidate/draft hoàn chỉnh đã ghi bền | terminal |
+| `partial` | Stream đứt/timeout/`finish_reason` cắt, hoặc chỉ giữ được bản dở đã lưu | terminal |
+| `invalid` | Parse/schema/scope sai sau khi nhận xong | terminal |
+| `error` | Lỗi trước khi có payload dùng được | terminal |
+
+Luật terminal:
+
+- `saved` là **mốc duy nhất** cho phép UI báo “candidate ready” và cho Accept/Review/Finalize.
+  `transport_complete` **không** được báo là hoàn tất.
+- `partial`, `invalid`, `error` **không** tạo candidate complete, **không** auto accept, **không**
+  mở Review/Finalize; accepted/candidate hợp lệ cũ giữ nguyên; raw/partial/error lưu theo
+  `storage.md` mục 11.
+- Provider `non_streaming` phải hiển thị đúng; **không** phát delta giả.
+- Sau `partial`, **không** tự gửi request fallback thứ hai. Retry là action explicit của user và
+  dùng lại `operation_id`; replay operation đã `saved` không gọi/merge trùng.
+
+### 11.3. Preview coverage và warning one-arc (D017)
+
+UI Long Plan hiển thị trước Accept: tổng horizon, từng volume/arc và `chapter_range`, tổng số
+chương phủ, và cảnh báo **non-blocking** khi cả plan chỉ có một arc. Đây là preview/warning dựa
+trên chính output validator trả về — không phải semantic validator, không phải quota và không
+đổi Auto Accept (D017 điểm 6–7).
+
+### 11.4. Editor working copy
+
+| Khái niệm | Contract |
+|---|---|
+| Phạm vi | Session-scoped, khóa theo `project_id` + `artifact_id` + `revision` (+ `chapter_id` nếu có). Không dùng chung giữa project hay workspace. |
+| Nội dung | Chỉ field nội dung người dùng sửa được. `artifact_id`, `status`, `revision`, `dependency_pins`, `planning_scope`, stable ID là read-only. |
+| Save | Mutation tường minh → service edit-candidate → validate → ghi **candidate**. Không ghi accepted, không lưu theo keystroke. |
+| Auto Accept | Save thủ công **không** tự Accept dù `auto_accept_structured = true`. Output AI đã auto-accept ⇒ view ghi `accepted` + action **Revise** tường minh. |
+| Roundtrip | Field optional/nested không có widget phải giữ nguyên khi Save. |
+| Stale | Working copy có `revision`/pin cũ hơn revision hiện tại ⇒ Save bị từ chối (`stale_working_copy`), không overwrite revision mới; UI giữ input và chỉ field/card lỗi. |
+| Raw JSON | Đi qua **cùng** service/validation như form schema-aware; không phải đường ghi tắt. |
+| Prose | Save prose tạo prose revision mới và vô hiệu Human Review cũ (D002); Finalize/Retcon giữ action riêng. |
+
+Add/remove/reorder trong working copy phải qua ID allocator + scope/FK/freshness guard của app.
+Không thêm form framework mới: form dựng trực tiếp theo schema thật.
+

@@ -7,15 +7,18 @@ thêm default che mất dữ liệu, test này fail.
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from novel_ai.core.models import (
     ARTIFACT_PAYLOAD_MODELS,
     ChapterMetadata,
     CoCreateDocument,
     CurrentTimelineDocument,
+    PlanningScope,
     ProjectConfig,
     RelationshipStateDocument,
     RewriteSectionPayload,
@@ -114,6 +117,43 @@ def test_artifact_envelope_round_trips_without_losing_data(
     envelope_dump = envelope.model_dump(mode="json")
     assert envelope_dump["stale_reasons"] == raw["stale_reasons"]
     assert envelope_dump["history_refs"] == raw["history_refs"]
+
+
+def test_planning_scope_round_trips_and_legacy_files_stay_readable(
+    t02_valid_document: dict[str, Any],
+) -> None:
+    """T30: `planning_scope` là metadata app-owned, optional, round-trip được.
+
+    File cũ (không có field) phải parse ra `None` = legacy, không raise: nếu thêm
+    field mà làm project cũ không mở được thì migration D017 vô nghĩa.
+    """
+    raw = t02_valid_document["artifacts"]["long_plan"]
+    legacy = parse_artifact_document(raw)
+    legacy_revision = legacy.accepted_revision or legacy.candidate_revision
+    assert legacy_revision is not None
+    assert legacy_revision.planning_scope is None
+
+    with_scope = copy.deepcopy(raw)
+    with_scope["accepted_revision"]["planning_scope"] = {"start": 1, "end": 120}
+    parsed = parse_artifact_document(with_scope)
+    revision = parsed.accepted_revision or parsed.candidate_revision
+    assert revision is not None
+    assert revision.planning_scope.start == 1
+    assert revision.planning_scope.end == 120
+    # Round-trip: dump lại rồi parse lại vẫn giữ nguyên horizon.
+    dumped = parsed.model_dump(mode="json")
+    assert dumped["accepted_revision"]["planning_scope"] == {"start": 1, "end": 120}
+    reparsed = parse_artifact_document(dumped)
+    reparsed_revision = reparsed.accepted_revision or reparsed.candidate_revision
+    assert reparsed_revision is not None
+    assert reparsed_revision.planning_scope == revision.planning_scope
+
+
+@pytest.mark.parametrize("scope", [{"start": 5, "end": 2}, {"start": 0, "end": 3}])
+def test_planning_scope_rejects_invalid_range(scope: dict[str, int]) -> None:
+    """`1 <= start <= end` là invariant của D017, không chỉ của service."""
+    with pytest.raises(ValidationError):
+        PlanningScope.model_validate(scope)
 
 
 def test_envelope_metadata_is_preserved_verbatim(t02_valid_document: dict[str, Any]) -> None:

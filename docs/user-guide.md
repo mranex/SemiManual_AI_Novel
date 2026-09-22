@@ -32,21 +32,49 @@ Hai câu cần nhớ:
 
 ## Bố cục màn hình
 
-Theo `novel_ai_spec_v0.2.md` mục 28, màn hình có nav ở đỉnh, ba vùng giữa và status bar ở đáy:
+Theo D018 (`docs/design/decisions.md` — refinement của spec mục 28), màn hình có nav ở đỉnh,
+workspace full-width, drawer project bên trái, Arbiter **compact tuỳ mở** và status bar ở đáy:
 
 | Vùng | Nội dung | Ghi chú |
 |---|---|---|
 | Nav (đỉnh) | 9 workspace | Bấm nav chỉ **đổi workspace**; không chạy action, không gọi LLM. |
-| `PROJECT` (trái) | Cây artifact/chapter | Glyph: `●` accepted, `◆` candidate, `▲` STALE, `○` chưa có, `⚠` recovery. Cây đọc **metadata**, không suy từ file. |
-| `CURRENT WORKSPACE` (giữa) | Page của workspace đang chọn | Mọi action ghi dữ liệu nằm ở đây. |
-| `ARBITER` (phải) | Trạng thái + bước tiếp theo | Chỉ đọc state; nút "Chuyển tới …" đổi workspace giúp bạn. |
+| Sidebar `PROJECT` (drawer) | Chọn/tạo project + cây artifact/chapter | Glyph: `●` accepted, `◆` candidate, `▲` STALE, `○` chưa có, `⚠` recovery. Cây đọc **metadata**, không suy từ file. |
+| `CURRENT WORKSPACE` | Page của workspace đang chọn | Chiếm full width khi Arbiter đóng; mọi action ghi dữ liệu nằm ở đây. |
+| `ARBITER` (tuỳ mở) | Trạng thái + bước tiếp theo | Toggle ở toolbar; chỉ đọc state. Nút "Chuyển tới …" đổi workspace giúp bạn. |
+| Cảnh báo ở main | recovery / read-only / stale / pending | Luôn hiển thị **kể cả khi** drawer và Arbiter đang đóng. |
 | Status bar (đáy) | API/model/context/project/chapter/prose | Không tự báo "Connected": chỉ hiện `Đã kết nối` sau khi bạn bấm **Kiểm tra kết nối** và request thật thành công. |
-| Sidebar | Chọn/tạo project + kiểm tra kết nối LLM | Streamlit sidebar; phần workspace không còn ở đây. |
 
 Cây project còn có một selectbox **"Node đang xem"** để bạn chọn nhanh một artifact/chapter và xem
 ngữ cảnh của nó; nó chỉ là tiện dụng, không đổi workspace và không ghi gì.
 
 Kết quả của một action hiện ở đầu workspace **đã bấm action đó** và không rò sang workspace khác.
+
+### Điều khiển bằng bàn phím
+
+Shell dùng được hoàn toàn bằng bàn phím (đã kiểm tự động trên browser thật —
+`docs\design\examples\check_keyboard_focus.py`):
+
+- **Tab** đi lần lượt: control thu gọn sidebar → tabs Tạo/Mở project → form → cây project → nút
+  kiểm tra kết nối → nav workspace → nút `Arbiter` → form workspace → các nút action; hết vòng thì
+  quay lại đầu.
+- **Enter** trên công tắc sidebar để thu gọn/mở drawer; **Enter** trên `▸ Arbiter` để mở/đóng panel
+  Arbiter; **Enter** trên nút `Chuyển tới …` trong Arbiter để đổi workspace.
+- Ở navbar, focus vào nhóm workspace rồi dùng **←/→** (hoặc **↑/↓**) để đổi workspace.
+
+### Editor: form, raw JSON và Save ≠ Accept
+
+Mọi artifact structured có editor **schema-aware** thay vì bắt bạn sửa JSON:
+
+- **Tab Editor (form)**: field đúng schema thật của artifact; stable ID / status / revision /
+  pin / `chapter_number` / `planning_scope` là metadata do app quản lý nên hiển thị read-only.
+  Danh sách ID (character / world rule / foreshadow) là **multiselect lấy từ accepted index**, chỉ
+  chứa ID đúng loại.
+- **Tab JSON thô (sửa)** ở nhóm "nâng cao": dùng **cùng** service và cùng guard, nên metadata
+  app-owned vẫn không sửa được từ đây.
+- **Save** chỉ tạo/cập nhật candidate; **không** tự Accept dù `auto_accept_structured` bật. Nội
+  dung đang sửa còn nguyên khi Save lỗi; nút *Nạp lại editor từ candidate* để bỏ thay đổi chưa Save.
+- Editor prose (Writer/Review) có tab **Edit | Preview** kèm số từ/ký tự; Preview chỉ hiển thị nội
+  dung đang sửa, **không** ghi file, không tạo revision.
 
 ## Các khái niệm trạng thái
 
@@ -144,6 +172,26 @@ Cấp `Volume → Arc`. Long Plan quản lý:
 
 Long Plan **không** viết chapter prose và **không** chứng minh sự kiện đã xảy ra.
 
+### Horizon (`planning_scope`) do bạn quyết định
+
+Trước khi Generate bạn nhập `planning_scope.start` / `planning_scope.end`: **toàn bộ horizon cần
+kiến trúc** (có thể nhiều volume/arc hoặc cả truyện), không phải số chương của một arc và không
+phải cửa sổ chỉnh sửa. App **không** suy horizon từ tiến độ viết và không có mặc định ngầm.
+
+- Candidate hiển thị **Preview coverage** (horizon, số volume/arc, phạm vi từng arc, khoảng thiếu)
+  chạy đúng luật validator; Accept chỉ chạy khi coverage **liên tục, nonempty và phủ đúng hai đầu**.
+- `planning_scope` là metadata app-owned lưu trên revision: sống qua candidate/reload/Accept và
+  **không** sửa được từ form hay raw JSON.
+- Plan chỉ có một arc vẫn hợp lệ nhưng hiện **warning non-blocking** (chất lượng truyện không đo
+  bằng số arc; app không áp quota).
+- **Accepted legacy** (tạo trước khi có `planning_scope`) hiện banner riêng và chỉ được xác nhận
+  horizon bằng action tường minh của bạn; mở project **không** tự ghi file, app không lấy min/max
+  arc hiện có làm horizon gốc.
+
+Sửa candidate trước khi Accept: tab **Editor (form)** cho phép chọn Volume và sửa từng Arc (card,
+gồm `chapter_range`); volume/arc khác giữ nguyên khi Save. Thêm arc mới cần ID do backend cấp
+(`assign_ids`) — nút thêm/bỏ arc chưa có, hãy sửa field/range hoặc dùng tab **JSON thô (sửa)**.
+
 ## Workspace Short Plan
 
 Cấp `Arc → Chapter`. Mỗi chapter tối thiểu gồm `chapter_id`, `chapter_number`, `summary`, `hook`,
@@ -154,6 +202,24 @@ entity được khai mới vào context (không similarity search).
 `outline` nhận item string (beat) hoặc item object `{language, pov, length_guidance}`.
 
 Accept Short Plan sẽ tạo `chapter.json` cho các chapter trong arc với `short_plan_pin`.
+
+Khi arc **không còn** chapter nào để lập mới (mọi chapter đã có plan hoặc đã final), app nói rõ và
+vẫn hiện panel **Candidate vs accepted** để bạn xem/sửa/accept candidate đang chờ — không phải mở
+Raw JSON.
+
+### Default viết của project và override từng chương
+
+Contract viết gồm `language`, `pov`, `length_guidance`. Giá trị **hiệu lực** của mỗi chapter =
+override bạn nhập cho chương đó, ngược lại là default của project (`default_pov`,
+`default_length_guidance` trong `project.json`). Luật:
+
+- Bạn đặt **Default viết của project** rồi bấm *Lưu default viết* (chỉ ghi `project.json`, không
+  gọi LLM, không sửa accepted plan). Đổi default **không** rewrite Short Plan đã accepted.
+- Guard backend chạy **trước khi gọi LLM**: nếu bất kỳ chapter được giao nào còn thiếu
+  language/pov/length thì action bị chặn, **không có request nào** được phát đi. App không tự bịa
+  POV/độ dài hộ bạn.
+- Candidate sửa được bằng form (summary/hook/outline/goal/ending/relationships + multiselect ID)
+  mà không cần JSON; caption hiện contract viết hiệu lực của chapter đang sửa.
 
 Hai luật cần biết khi lập lại plan:
 
@@ -195,6 +261,14 @@ Accept Skeleton set `chapter.skeleton_pin` và đưa chapter sang `skeleton_read
 Skeleton accepted hiện tại (ví dụ bạn regenerate Skeleton), Writer và Finalize bị chặn cho tới khi
 accept lại.
 
+Sửa candidate trước khi Accept bằng tab **Editor (form)**: mỗi section là card
+(`index`/`type`/`instruction`/`purpose`/`required_beats`/`forbidden_moves`/`foreshadow_surfaces`),
+`character_ids`/`world_rule_ids`/`foreshadow_ids` là multiselect ID đúng loại, `section_id` và
+`chapter_number` read-only (app cấp). Nút *Thêm section* lấy ID mới từ backend
+(`assign_section_ids`); checkbox *Bỏ …* bỏ section khỏi working copy (chỉ áp dụng khi Save). Tab
+**JSON thô (sửa)** vẫn dùng cùng guard. Lưu ý: field enum như `purpose_visibility` chưa có widget
+nên form giữ nguyên giá trị — muốn đổi phải dùng raw JSON.
+
 ### Provisional candidate
 
 Nếu chương trước chưa có state **hợp lệ** (`final_reconciled` và không stale), context của
@@ -230,8 +304,9 @@ Action: `Generate`, `Continue`, `Save Draft`, `Regenerate`, `Discard`.
 
 Review là gate cứng sau mỗi chapter.
 
-**Manual Review**: bạn đọc và sửa prose. Có thể sửa cả text area, hoặc rewrite theo đoạn (chọn
-`section_id` hoặc dán `selected_text` + instruction). Không có `Apply All` rewrite toàn chapter.
+**Manual Review**: bạn đọc và sửa prose ngay trong editor **Edit | Preview** (Preview chỉ hiển thị
+nội dung đang sửa, kèm số từ/ký tự — không ghi file), hoặc rewrite theo đoạn (chọn `section_id`
+hoặc dán `selected_text` + instruction). Không có `Apply All` rewrite toàn chapter.
 
 **AI Review**: AI kiểm tra skeleton adherence, Base Idea/Premise/Character/World Rule conflict,
 timeline + relationship continuity, foreshadow instruction và logic issue. AI Review **chỉ báo vấn
@@ -248,7 +323,11 @@ Finalize Chapter là hành động first-class, không phải "lưu file".
 2. Prose được đóng băng thành final manuscript candidate; chapter sang `finalizing`.
 3. **Generate reconciliation**: AI trích `timeline` (`time`, `location`, `status`) và
    `relationship_updates` từ final candidate. Raw output được lưu trước khi parse.
-4. Bạn xem JSON, có thể sửa tay rồi **Accept reconciliation** (hoặc `Reject` / `Cancel finalizing`).
+4. Bạn xem proposal và sửa bằng tab **Editor (form)** — timeline là group field, mỗi relationship
+   update là card theo cặp character ID (multiselect) — hoặc tab **JSON thô (sửa)**; cả hai đi qua
+   cùng `edit_reconciliation_candidate`. `chapter_id`/`chapter_number`/`source_final_candidate` là
+   metadata app-owned. Để trống `relationship_id` nghĩa là backend resolve/tạo quan hệ theo cặp.
+   Sau đó **Accept reconciliation** (hoặc `Reject` / `Cancel finalizing`).
 5. Transaction commit nhiều file: final prose → reconciliation artifact → `current_timeline.json` →
    `relationships.json` → snapshot chương sau → `chapter.json` (luôn **cuối cùng**).
 6. Chỉ khi commit xong chapter mới `final_reconciled` và Writer chương sau mới unlock.
@@ -286,7 +365,8 @@ và bạn phải regenerate.
 2. Sửa draft, review lại, Finalize lại, Reconcile lại.
 3. `reset_consistency_after_retcon` hạ `latest_consistent_chapter` về chương retcon và đánh dấu
    `stale` state của các chương sau. Timeline/relationship `current` **không** bị ghi lùi.
-4. **Không** tự rewrite chương sau. Dùng *reconcile_downstream* để rebuild từng chương theo thứ tự.
+4. **Không** tự rewrite chương sau. Dùng *reconcile_downstream* để rebuild từng chương theo thứ tự;
+   action này cũng hiển thị generation surface (transcript) như workspace Reconcile.
 
 ### Recovery
 
@@ -325,7 +405,7 @@ Arbiter cũng báo artifact `stale`, pending operation cần recovery, và nhắ
 1.  Tạo project
 2.  Co-create → Finalize Idea                    → idea/base_idea.md accepted
 3.  Architect: Premise → Characters → World Rules → Foreshadow (Accept từng phần)
-4.  Long Plan: generate → Accept
+4.  Long Plan: nhập horizon → generate → Accept  → volume/arc theo đúng horizon
 5.  Short Plan: chọn arc, gán ch1 → generate → Accept   → chapter.json ch_0001 (planned)
 6.  Skeleton ch1: generate → Accept                     → skeleton_pin, ch1 skeleton_ready
 7.  Writer ch1: Generate                                → draft r1 complete, ch1 review_required
@@ -339,6 +419,9 @@ Arbiter cũng báo artifact `stale`, pending operation cần recovery, và nhắ
 
 Bước 12 là gate quan trọng nhất: nếu bước 9 chưa xong, `guard_writer` chặn và client LLM **không**
 được gọi lần nào.
+
+Bước 4 và 5 có hai guard cần nhớ: horizon phải do bạn nhập (không có default ngầm), và contract viết
+phải đủ (default project hoặc override từng chương) **trước khi** Short Plan gọi LLM.
 
 ## Điều app cố tình **không** làm
 

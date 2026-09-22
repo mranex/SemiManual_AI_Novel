@@ -1,24 +1,33 @@
-"""Long Plan service (T14).
+"""Long Plan service (T14, sửa theo horizon contract T30).
 
 Hiện thực action Long Plan theo `docs/design/workflow.md` mục 4.2 và
-`docs/design/schemas.md` mục 3.1:
+`docs/design/schemas.md` mục 3.1/3.3/3.4:
 
 - `generate`: Volume/Arc candidate từ LLM; guard Base Idea + Premise accepted và
   foundation không stale **trước** khi gọi LLM;
-- `accept`: validate lại toàn payload + FK + range, kiểm tra freshness pin, rồi
-  đánh dấu stale Short Plan/Skeleton/draft/review liên quan (chỉ đánh dấu, không
-  rewrite). Không đụng timeline/relationship;
-- `reject`: bỏ candidate, giữ accepted cũ.
+- `accept`: validate lại toàn payload + FK + coverage theo `planning_scope` đã lưu
+  trên candidate, kiểm tra freshness pin, rồi đánh dấu stale Short Plan/Skeleton/
+  draft/review liên quan (chỉ đánh dấu, không rewrite). Không đụng
+  timeline/relationship;
+- `reject`: bỏ candidate, giữ accepted cũ;
+- `confirm_planning_scope`: action tường minh để gán horizon cho accepted revision
+  legacy (D017) — không tự chạy khi mở project.
 
-Quyết định phát sinh (đã ghi ở bàn giao T14):
+Contract horizon (D017, T29):
 
-- `planning_scope` mặc định được suy theo `resolve_planning_scope`: `start = 1`,
-  `end = max(3, current_chapter, arc range end lớn nhất của Long Plan accepted,
-  chapter_number lớn nhất của Short Plan accepted/chapter metadata)`. Caller có
-  thể truyền scope tường minh; scope luôn được kiểm tra `1 <= start <= end`.
-- Pool `vol_`/`arc_` được reserve dư (mặc định 2 volume, 6 arc); LLM có thể dùng
-  `tmp_volume_<n>`/`tmp_arc_<n>` cho entry mới, backend map sang stable ID trước
-  validation/accept và lưu mapping trong `PayloadSource.id_map` (D014).
+- `planning_scope = {start, end}` là **toàn horizon cần kiến trúc**, không phải
+  kích thước arc và không phải edit window. Nó là metadata app-owned trên
+  `ArtifactRevision.planning_scope`, không nằm trong payload LLM trả.
+- Horizon **không** được suy từ `current_chapter`, Short Plan hay chapter metadata.
+  `generate` cần input tường minh; `regenerate`/`edit` dùng scope đã lưu.
+- Candidate phải phủ đúng horizon (không gap/overlap/out-of-scope, đủ hai đầu).
+  Cùng một hàm validate chạy cho generate/regenerate/edit/accept/auto accept.
+- Số volume/arc không có quota: một arc phủ đúng horizon vẫn hợp lệ về cấu trúc;
+  service chỉ trả **warning** non-blocking khi cả plan có một arc.
+
+Pool `vol_`/`arc_` được reserve dư (mặc định 2 volume, 6 arc); LLM có thể dùng
+`tmp_volume_<n>`/`tmp_arc_<n>` cho entry mới, backend map sang stable ID trước
+validation/accept và lưu mapping trong `PayloadSource.id_map` (D014).
 """
 
 from __future__ import annotations
@@ -26,12 +35,18 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
+from pydantic import ValidationError
+
 from novel_ai.core import context as context_core
 from novel_ai.core import lifecycle, storage, validation
+from novel_ai.core.generation import EventSink, GenerationEmitter
 from novel_ai.core.models import (
     ARTIFACT_PAYLOAD_MODELS,
     ArtifactEnvelope,
     LongPlanPayload,
+    PayloadSource,
+    PlanningScope,
+    SourceType,
     generate_operation_id,
     is_temporary_id,
     next_stable_id,
@@ -42,13 +57,16 @@ from novel_ai.core.project import Project
 from novel_ai.services import (
     ActionResult,
     GuardError,
+    ValidationFailure,
     StaleDependencyError,
 )
 from novel_ai.services.co_create import (
     artifact_write_committed,
+    current_dependency_pins,
     check_pin_freshness,
     complete_json,
     foundation_reference_index,
+    generation_stage,
     parse_structured_or_fail,
     payload_source,
     require_accepted_artifact,
@@ -56,17 +74,28 @@ from novel_ai.services.co_create import (
     validate_or_fail,
 )
 
-__all__ = ["accept", "generate", "reject", "resolve_planning_scope"]
+__all__ = [
+    "accept",
+    "assign_ids",
+    "edit_candidate",
+    "confirm_planning_scope",
+    "generate",
+    "reject",
+    "resolve_planning_scope",
+    "single_arc_warning",
+    "stored_planning_scope",
+]
 
 LONG_PLAN_ARTIFACT_ID = "long_plan"
 LONG_PLAN_PROMPT_ID = "long_plan.v1"
 
-#: Pool ID reserve mặc định khi generate (pool để dư, không bắt dùng hết).
-DEFAULT_VOLUME_ID_POOL = 2
-DEFAULT_ARC_ID_POOL = 6
+#: Pool ID reserve khi generate. Đây là **nguồn ID**, không phải chỉ tiêu phải dùng
+#: hết và không phải quota số volume/arc: pool đủ rộng để horizon lớn (nhiều
+#: volume/arc) vẫn có stable ID backend cấp. Nếu vẫn thiếu, model dùng ID cục bộ
+#: `tmp_volume_<n>`/`tmp_arc_<n>` và backend map sang stable ID mới (D014, T30).
+DEFAULT_VOLUME_ID_POOL = 12
+DEFAULT_ARC_ID_POOL = 36
 
-#: Scope tối thiểu cho project mới (chưa có plan/chapter nào).
-MIN_PLAN_SCOPE_END = 3
 
 
 # ---------------------------------------------------------------------------
@@ -109,44 +138,81 @@ def _existing_arc_ids(project: Project) -> set[str]:
     }
 
 
-def resolve_planning_scope(
-    project: Project, planning_scope: Mapping[str, Any] | None = None
-) -> dict[str, int]:
-    """Chốt `planning_scope` thật sự dùng cho lần generate này.
+def stored_planning_scope(project: Project) -> dict[str, int] | None:
+    """Horizon đã lưu trên candidate hoặc accepted revision; `None` = legacy.
 
-    Caller truyền scope tường minh thì scope đó được dùng (sau khi kiểm tra
-    `1 <= start <= end`). Không truyền thì suy từ Long Plan/Short Plan/chapter
-    hiện có như mô tả ở docstring module.
+    Dùng cho UI prefill và cho `regenerate`/`edit`. Hàm chỉ đọc: nó **không** suy
+    horizon từ progress, Short Plan hay chapter metadata (D017).
+    """
+    envelope = storage.load_artifact(project, LONG_PLAN_ARTIFACT_ID)
+    if envelope is None:
+        return None
+    for revision in (envelope.candidate_revision, envelope.accepted_revision):
+        if revision is not None and revision.planning_scope is not None:
+            return {
+                "start": int(revision.planning_scope.start),
+                "end": int(revision.planning_scope.end),
+            }
+    return None
+
+
+def _coerce_scope(planning_scope: Mapping[str, Any]) -> PlanningScope:
+    start = int(planning_scope["start"])
+    end = int(planning_scope["end"])
+    if start < 1 or end < start:
+        raise GuardError(
+            f"`planning_scope` không hợp lệ: {{'start': {start}, 'end': {end}}}; "
+            "cần 1 <= start <= end.",
+            code="invalid_planning_scope",
+            details={"start": start, "end": end},
+        )
+    return PlanningScope(start=start, end=end)
+
+
+def resolve_planning_scope(
+    project: Project,
+    planning_scope: Mapping[str, Any] | None = None,
+    *,
+    action: str = "generate",
+) -> PlanningScope:
+    """Chốt `planning_scope` cho lần generate/regenerate/edit này (D017).
+
+    - Caller truyền scope tường minh ⇒ dùng scope đó (kiểm `1 <= start <= end`);
+    - Không truyền và action là `regenerate`/`edit` ⇒ dùng horizon đã lưu;
+    - Không truyền ở `generate` (hoặc revision legacy không có scope) ⇒
+      `GuardError` `missing_planning_scope`.
+
+    Horizon **không** bao giờ được suy từ `current_chapter`, Short Plan hay chapter
+    metadata: đó chính là lỗi BUG-004.
     """
     if planning_scope is not None:
-        start = int(planning_scope.get("start", 1))
-        end = int(planning_scope.get("end", start))
-        if start < 1 or end < start:
-            raise GuardError(
-                f"`planning_scope` không hợp lệ: {dict(planning_scope)}; cần 1 <= start <= end.",
-                code="invalid_planning_scope",
-            )
-        return {"start": start, "end": end}
+        return _coerce_scope(planning_scope)
 
-    ends: list[int] = []
-    for payload in _payloads(project):
-        ends.extend(
-            arc.chapter_range.end
-            for volume in getattr(payload, "volumes", []) or []
-            for arc in volume.arcs
-        )
-    short_plan = storage.load_artifact(project, "short_plan")
-    if short_plan is not None and short_plan.accepted_revision is not None:
-        ends.extend(
-            chapter.chapter_number
-            for chapter in getattr(short_plan.accepted_revision.payload, "chapters", []) or []
-        )
-    for chapter_id in storage.list_chapter_ids(project):
-        chapter = storage.load_chapter(project, chapter_id)
-        if chapter is not None:
-            ends.append(chapter.chapter_number)
-    end = max([MIN_PLAN_SCOPE_END, int(project.config.current_chapter), *ends])
-    return {"start": 1, "end": end}
+    stored = stored_planning_scope(project)
+    if stored is not None:
+        return _coerce_scope(stored)
+    raise GuardError(
+        "Thiếu `planning_scope`: cần chọn rõ horizon cần kiến trúc (start..end) "
+        "trước khi lập Long Plan. App không suy horizon từ tiến độ viết.",
+        code="missing_planning_scope",
+        details={"action": action},
+    )
+
+
+def single_arc_warning(payload: LongPlanPayload) -> str | None:
+    """Warning non-blocking khi cả plan chỉ có một arc (D017, `schemas.md` 11.3).
+
+    Đây **không** phải validator và không phải quota: một arc phủ đúng horizon vẫn
+    hợp lệ về cấu trúc. Warning chỉ nhắc người dùng rằng plan chưa thể hiện phân rã
+    nhiều phase, và không đổi Auto Accept.
+    """
+    arcs = [arc for volume in payload.volumes for arc in volume.arcs]
+    if len(arcs) > 1:
+        return None
+    return (
+        "Long Plan chỉ có một arc cho toàn horizon: kiểm tra lại phân rã theo chuyển biến "
+        "truyện nếu horizon bao gồm nhiều phase. Đây là cảnh báo, không phải lỗi cấu trúc."
+    )
 
 
 def _allocate_stable_id(prefix: str, used: set[str], pool: Iterator[str]) -> str:
@@ -239,37 +305,16 @@ def map_temporary_ids(
     return payload.model_copy(update={"volumes": volumes}), id_map, issues
 
 
-def _range_issues(
+def horizon_issues(
     payload: LongPlanPayload, *, scope: Mapping[str, int] | None
 ) -> list[validation.ValidationIssue]:
-    """`chapter_range` phải nằm trong scope và không chồng lấn giữa các arc."""
-    collector = validation.IssueCollector()
-    ranges: list[tuple[int, int, str]] = []
-    for volume_position, volume in enumerate(payload.volumes):
-        for arc_position, arc in enumerate(volume.arcs):
-            low = arc.chapter_range.start
-            high = arc.chapter_range.end
-            path = validation.json_pointer(
-                "payload", "volumes", volume_position, "arcs", arc_position, "chapter_range"
-            )
-            if scope is not None and (low < int(scope["start"]) or high > int(scope["end"])):
-                collector.add(
-                    path,
-                    "out_of_scope",
-                    f"chapter_range {low}-{high} nằm ngoài planning_scope "
-                    f"{scope['start']}-{scope['end']}.",
-                )
-            ranges.append((low, high, arc.arc_id))
-    ordered = sorted(ranges)
-    for (low, high, arc_id), (next_low, _next_high, next_arc_id) in zip(ordered, ordered[1:]):
-        if next_low <= high:
-            collector.add(
-                "/payload",
-                "overlapping_chapter_range",
-                f"Arc `{arc_id}` ({low}-{high}) chồng lấn arc `{next_arc_id}` "
-                f"(bắt đầu {next_low}).",
-            )
-    return collector.issues
+    """Coverage/structural issues của payload theo horizon (D017).
+
+    Bọc `validation.long_plan_horizon_issues` để service và validator dùng đúng một
+    luật. `scope=None` chỉ kiểm phần không phụ thuộc horizon (payload/volume rỗng,
+    range sai) — dùng khi chỉ đọc payload mà chưa có horizon.
+    """
+    return validation.long_plan_horizon_issues(payload, scope)
 
 
 def _id_scope_issues(
@@ -279,10 +324,13 @@ def _id_scope_issues(
     arc_pool: Sequence[str],
     existing_volume_ids: set[str],
     existing_arc_ids: set[str],
+    mapped_volume_ids: set[str] = frozenset(),
+    mapped_arc_ids: set[str] = frozenset(),
 ) -> list[validation.ValidationIssue]:
-    """Volume/arc ID phải thuộc pool backend cấp hoặc ID cũ của plan hiện có."""
-    allowed_volumes = {*volume_pool, *existing_volume_ids}
-    allowed_arcs = {*arc_pool, *existing_arc_ids}
+    """Volume/arc ID phải thuộc pool backend cấp, ID cũ của plan, hoặc ID vừa được
+    backend map từ ID cục bộ `tmp_*` (pool cạn vẫn phải dùng được — T30)."""
+    allowed_volumes = {*volume_pool, *existing_volume_ids, *mapped_volume_ids}
+    allowed_arcs = {*arc_pool, *existing_arc_ids, *mapped_arc_ids}
     collector = validation.IssueCollector()
     for volume_position, volume in enumerate(payload.volumes):
         if volume.volume_id not in allowed_volumes:
@@ -319,12 +367,16 @@ def generate(
     user_instruction: str = "",
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Generate/regenerate Long Plan candidate.
 
-    Guard: Base Idea accepted + Premise accepted và không stale. Scope, pool ID
-    và context được chốt trước khi gọi LLM; output luôn là candidate (hoặc
-    accepted nếu Auto Accept bật và payload hợp lệ).
+    Guard: Base Idea accepted + Premise accepted và không stale; `planning_scope`
+    rõ ràng (tường minh hoặc đã lưu) và pool ID/context được chốt **trước** khi
+    gọi LLM. Output luôn là candidate (hoặc accepted nếu Auto Accept bật và payload
+    hợp lệ theo đúng horizon). `on_event` nhận `GenerationEvent` (T33/D019).
     """
     if action not in {"generate", "regenerate", "edit"}:
         raise GuardError(
@@ -333,7 +385,20 @@ def generate(
     op_id = operation_id or generate_operation_id()
     require_base_idea(project)
     require_accepted_artifact(project, "premise")
-    scope = resolve_planning_scope(project, planning_scope)
+    scope = resolve_planning_scope(project, planning_scope, action=action)
+    scope_dict = {"start": scope.start, "end": scope.end}
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action=f"long_plan.{action}",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=LONG_PLAN_PROMPT_ID,
+            artifact_id=LONG_PLAN_ARTIFACT_ID,
+        )
+        if on_event is not None
+        else None
+    )
 
     volume_pool = reserve_id_pool("vol", DEFAULT_VOLUME_ID_POOL, _existing_volume_ids(project))
     arc_pool = reserve_id_pool("arc", DEFAULT_ARC_ID_POOL, _existing_arc_ids(project))
@@ -341,7 +406,7 @@ def generate(
     try:
         bundle = context_core.build_long_plan_context(
             project,
-            planning_scope=scope,
+            planning_scope=scope_dict,
             assigned_volume_ids=volume_pool,
             assigned_arc_ids=arc_pool,
             action=action,
@@ -358,46 +423,57 @@ def generate(
         operation_id=op_id,
         now=now,
         label="long_plan",
+        emitter=emitter,
+        stream=stream,
     )
-    parsed = parse_structured_or_fail(
-        project,
-        call=call,
-        model_cls=ARTIFACT_PAYLOAD_MODELS["long_plan"],
-        operation_id=op_id,
-        now=now,
-        label="long_plan",
-        artifact_id=LONG_PLAN_ARTIFACT_ID,
-    )
-    parsed, id_map, mapping_issues = map_temporary_ids(
-        parsed,
-        volume_pool=volume_pool,
-        arc_pool=arc_pool,
-        used_volume_ids=_existing_volume_ids(project),
-        used_arc_ids=_existing_arc_ids(project),
-    )
-    extra_issues = [
-        *mapping_issues,
-        *_range_issues(parsed, scope=scope),
-        *_id_scope_issues(
+    with generation_stage(emitter, detail="Đang parse/validate Long Plan."):
+        parsed = parse_structured_or_fail(
+            project,
+            call=call,
+            model_cls=ARTIFACT_PAYLOAD_MODELS["long_plan"],
+            operation_id=op_id,
+            now=now,
+            label="long_plan",
+            artifact_id=LONG_PLAN_ARTIFACT_ID,
+        )
+        parsed, id_map, mapping_issues = map_temporary_ids(
             parsed,
             volume_pool=volume_pool,
             arc_pool=arc_pool,
-            existing_volume_ids=_existing_volume_ids(project),
-            existing_arc_ids=_existing_arc_ids(project),
-        ),
-    ]
-    result = validate_or_fail(
-        project,
-        artifact_type="long_plan",
-        payload=parsed,
-        context=validation.ValidationContext(index=foundation_reference_index(project)),
-        operation_id=op_id,
-        now=now,
-        label="long_plan",
-        raw_output_ref=call.raw_ref,
-        artifact_id=LONG_PLAN_ARTIFACT_ID,
-        extra_issues=extra_issues,
-    )
+            used_volume_ids=_existing_volume_ids(project),
+            used_arc_ids=_existing_arc_ids(project),
+        )
+        extra_issues = [
+            *mapping_issues,
+            *horizon_issues(parsed, scope=scope_dict),
+            *_id_scope_issues(
+                parsed,
+                volume_pool=volume_pool,
+                arc_pool=arc_pool,
+                existing_volume_ids=_existing_volume_ids(project),
+                existing_arc_ids=_existing_arc_ids(project),
+                mapped_volume_ids={
+                    new_id for old_id, new_id in id_map.items()
+                    if temporary_id_kind(old_id) == "volume"
+                },
+                mapped_arc_ids={
+                    new_id for old_id, new_id in id_map.items()
+                    if temporary_id_kind(old_id) == "arc"
+                },
+            ),
+        ]
+        result = validate_or_fail(
+            project,
+            artifact_type="long_plan",
+            payload=parsed,
+            context=validation.ValidationContext(index=foundation_reference_index(project)),
+            operation_id=op_id,
+            now=now,
+            label="long_plan",
+            raw_output_ref=call.raw_ref,
+            artifact_id=LONG_PLAN_ARTIFACT_ID,
+            extra_issues=extra_issues,
+        )
 
     envelope = _envelope_or_new(project, now=now)
     envelope = lifecycle.set_candidate(
@@ -406,10 +482,14 @@ def generate(
         source=payload_source(call, operation_id=op_id, id_map=id_map),
         dependency_pins=bundle.dependency_pins,
         validation=result,
+        planning_scope=scope,
         now=now,
     )
+    warnings = [message for message in (single_arc_warning(parsed),) if message]
     auto_accepted = False
     if project.config.auto_accept_structured:
+        # Auto Accept theo config sau **full structural validation** ở trên; warning
+        # one-arc không đổi hành vi này (D017 điểm 6–7).
         scope_result = validation.validate_auto_accept_scope(
             auto_accept_structured=True, output_kind="long_plan"
         )
@@ -419,6 +499,15 @@ def generate(
             )
             auto_accepted = True
     storage.save_artifact(project, envelope, operation_id=op_id)
+    if emitter is not None:
+        emitter.saved(
+            detail=(
+                "Auto Accept đã accept Long Plan sau full validation."
+                if auto_accepted
+                else "Long Plan candidate đã validate và lưu (chưa accept)."
+            ),
+            raw_ref=call.raw_ref,
+        )
 
     return ActionResult(
         operation_id=op_id,
@@ -430,15 +519,178 @@ def generate(
         ),
         data={
             "status": envelope.status.value,
-            "planning_scope": scope,
+            "planning_scope": scope_dict,
             "assigned_volume_ids": volume_pool,
             "assigned_arc_ids": arc_pool,
             "id_map": id_map,
             "auto_accepted": auto_accepted,
+            "warnings": warnings,
             "raw_output_ref": call.raw_ref,
             "context_id": bundle.context_id,
         },
         validation=result,
+    )
+
+
+def assign_ids(
+    project: Project, *, volume_count: int = DEFAULT_VOLUME_ID_POOL, arc_count: int = DEFAULT_ARC_ID_POOL
+) -> dict[str, list[str]]:
+    """Cấp pool ID mới cho entry thêm tay (T36) — app sở hữu stable ID.
+
+    Trả `{"volume_ids": [...], "arc_ids": [...]}`; ID đã tồn tại trong plan hiện có
+    bị loại khỏi pool.
+    """
+    return {
+        "volume_ids": reserve_id_pool(
+            "vol", max(1, int(volume_count)), _existing_volume_ids(project)
+        ),
+        "arc_ids": reserve_id_pool("arc", max(1, int(arc_count)), _existing_arc_ids(project)),
+    }
+
+
+def _temporary_ids_in(payload: LongPlanPayload) -> list[str]:
+    """ID tạm (`tmp_volume_*`/`tmp_arc_*`) còn sót trong payload người dùng sửa."""
+    leftovers: list[str] = []
+    for volume in payload.volumes:
+        if is_temporary_id(volume.volume_id):
+            leftovers.append(volume.volume_id)
+        for arc in volume.arcs:
+            if is_temporary_id(arc.arc_id):
+                leftovers.append(arc.arc_id)
+    return sorted(set(leftovers))
+
+
+def edit_candidate(
+    project: Project,
+    *,
+    payload: Mapping[str, Any] | LongPlanPayload,
+    planning_scope: Mapping[str, Any] | None = None,
+    expected_revision: int | None = None,
+    assigned_volume_ids: Sequence[str] = (),
+    assigned_arc_ids: Sequence[str] = (),
+    operation_id: str | None = None,
+    now: str | None = None,
+) -> ActionResult:
+    """Lưu bản Long Plan do **người dùng sửa** thành candidate mới (T36).
+
+    Không gọi LLM và **không** auto accept dù `auto_accept_structured` bật. Metadata
+    (`status`, `revision`, pins, `planning_scope`) do app sở hữu: payload người dùng
+    chỉ chứa nội dung; ID phải là stable ID đã có hoặc do `assign_ids` cấp.
+
+    Guard đầy đủ trước khi ghi: schema, không còn ID tạm, `planning_scope` hợp lệ và
+    coverage đúng horizon (D017), ID/FK resolve, và working copy không cũ hơn
+    revision hiện tại (`expected_revision`). Mọi lỗi giữ nguyên candidate/accepted cũ.
+    """
+    op_id = operation_id or generate_operation_id()
+    envelope = storage.load_artifact(project, LONG_PLAN_ARTIFACT_ID)
+    if envelope is None or (
+        envelope.accepted_revision is None and envelope.candidate_revision is None
+    ):
+        raise GuardError(
+            "Chưa có Long Plan accepted/candidate để sửa; hãy generate trước.",
+            code="missing_artifact",
+            details={"artifact_id": LONG_PLAN_ARTIFACT_ID},
+        )
+    base_revision_obj = envelope.candidate_revision or envelope.accepted_revision
+    assert base_revision_obj is not None
+    if expected_revision is not None and int(expected_revision) != int(base_revision_obj.revision):
+        raise GuardError(
+            f"Working copy đang dựa trên revision {expected_revision} nhưng Long Plan hiện tại "
+            f"là r{base_revision_obj.revision}; nạp lại rồi sửa tiếp (không ghi đè revision mới).",
+            code="stale_working_copy",
+            details={
+                "expected_revision": int(expected_revision),
+                "current_revision": int(base_revision_obj.revision),
+            },
+        )
+
+    data = payload.model_dump(mode="json") if isinstance(payload, LongPlanPayload) else dict(payload)
+    try:
+        parsed = LongPlanPayload.model_validate(data)
+    except ValidationError as exc:
+        issues = validation.issues_from_pydantic_error(exc, base_path="/payload")
+        raise ValidationFailure(
+            "Long Plan do bạn sửa không đúng contract: "
+            f"{validation.summarize_errors(validation.result_from_issues(issues))}",
+            result=validation.result_from_issues(issues),
+            code="invalid_payload",
+            details={"artifact_id": LONG_PLAN_ARTIFACT_ID},
+        ) from exc
+
+    leftovers = _temporary_ids_in(parsed)
+    if leftovers:
+        raise ValidationFailure(
+            "Bản sửa tay còn ID tạm ("
+            + ", ".join(leftovers)
+            + "); dùng `long_planner.assign_ids` để backend cấp stable ID.",
+            code="temporary_id_not_allowed",
+            details={"temporary_ids": leftovers},
+        )
+
+    stored_scope = base_revision_obj.planning_scope
+    if planning_scope is not None:
+        scope = _coerce_scope(planning_scope)
+    elif stored_scope is not None:
+        scope = PlanningScope(start=int(stored_scope.start), end=int(stored_scope.end))
+    else:
+        raise GuardError(
+            "Long Plan này là legacy (không có `planning_scope`): cần xác nhận horizon trước "
+            "khi sửa tay.",
+            code="missing_planning_scope",
+            details={"artifact_id": LONG_PLAN_ARTIFACT_ID},
+        )
+    scope_dict = {"start": scope.start, "end": scope.end}
+
+    result = validation.validate_artifact_payload(
+        "long_plan",
+        parsed,
+        context=validation.ValidationContext(index=foundation_reference_index(project)),
+    )
+    existing_volumes = _existing_volume_ids(project)
+    existing_arcs = _existing_arc_ids(project)
+    extra_issues = [
+        *horizon_issues(parsed, scope=scope_dict),
+        *_id_scope_issues(
+            parsed,
+            volume_pool=[str(item) for item in assigned_volume_ids],
+            arc_pool=[str(item) for item in assigned_arc_ids],
+            existing_volume_ids=existing_volumes,
+            existing_arc_ids=existing_arcs,
+        ),
+    ]
+    combined = validation.result_from_issues([*result.errors, *extra_issues])
+    if not combined.is_valid:
+        raise ValidationFailure(
+            "Long Plan sửa tay không qua validation: " + validation.summarize_errors(combined),
+            result=combined,
+            code="validation_failed",
+            details={"artifact_id": LONG_PLAN_ARTIFACT_ID},
+        )
+
+    updated = lifecycle.set_candidate(
+        envelope,
+        parsed,
+        source=PayloadSource(source_type=SourceType.user, operation_id=op_id),
+        dependency_pins=current_dependency_pins(project),
+        validation=combined,
+        planning_scope=scope,
+        now=now,
+    )
+    storage.save_artifact(project, updated, operation_id=op_id)
+    warnings = [message for message in (single_arc_warning(parsed),) if message]
+    return ActionResult(
+        operation_id=op_id,
+        artifact_id=LONG_PLAN_ARTIFACT_ID,
+        message="Đã lưu Long Plan candidate do bạn sửa (chưa accept; không gọi LLM).",
+        warnings=warnings,
+        data={
+            "status": updated.status.value,
+            "revision": updated.candidate_revision.revision
+            if updated.candidate_revision
+            else None,
+            "planning_scope": scope_dict,
+        },
+        validation=combined,
     )
 
 
@@ -486,6 +738,20 @@ def accept(
         raise GuardError("Long Plan không có candidate để accept.", code="missing_candidate")
 
     check_pin_freshness(project, candidate.dependency_pins, artifact_id=LONG_PLAN_ARTIFACT_ID)
+    if candidate.planning_scope is None:
+        raise GuardError(
+            "Candidate Long Plan không có `planning_scope` (legacy): regenerate với horizon "
+            "tường minh rồi accept lại. Không revalidate bằng scope suy diễn.",
+            code="missing_planning_scope",
+            details={
+                "candidate_revision": candidate.revision,
+                "next_step": "regenerate hoặc confirm_planning_scope cho accepted revision legacy",
+            },
+        )
+    scope_dict = {
+        "start": int(candidate.planning_scope.start),
+        "end": int(candidate.planning_scope.end),
+    }
     result = validate_or_fail(
         project,
         artifact_type="long_plan",
@@ -496,7 +762,7 @@ def accept(
         label="long_plan.accept",
         raw_output_ref=candidate.payload_source.raw_output_ref,
         artifact_id=LONG_PLAN_ARTIFACT_ID,
-        extra_issues=_range_issues(candidate.payload, scope=None),
+        extra_issues=horizon_issues(candidate.payload, scope=scope_dict),
     )
     accepted = lifecycle.accept_candidate(
         envelope, accepted_by=accepted_by, validation=result, now=now
@@ -517,6 +783,7 @@ def accept(
         change=lifecycle.STALE_CHANGE_LONG_PLAN_REPLACE,
         now=now,
     )
+    warnings = [message for message in (single_arc_warning(candidate.payload),) if message]
     return ActionResult(
         operation_id=op_id,
         artifact_id=LONG_PLAN_ARTIFACT_ID,
@@ -525,9 +792,86 @@ def accept(
             "status": accepted.status.value,
             "revision": revision,
             "accepted_by": accepted_by,
+            "planning_scope": scope_dict,
+            "warnings": warnings,
             "stale_marked": marked,
         },
         validation=result,
+    )
+
+
+def confirm_planning_scope(
+    project: Project,
+    *,
+    start: int,
+    end: int,
+    operation_id: str | None = None,
+    now: str | None = None,
+) -> ActionResult:
+    """Gán horizon cho accepted revision **legacy** (D017, `storage.md` mục 13).
+
+    Chỉ chạy khi user bấm action tường minh; mở project không bao giờ tự gọi hàm
+    này. Idempotent: accepted revision đã có scope ⇒ no-op, không snapshot mới,
+    không tăng revision. Nếu horizon không khớp coverage hiện có của payload thì
+    từ chối và accepted giữ nguyên.
+    """
+    scope = _coerce_scope({"start": start, "end": end})
+    envelope = storage.load_artifact(project, LONG_PLAN_ARTIFACT_ID)
+    if envelope is None or envelope.accepted_revision is None:
+        raise GuardError(
+            "Chưa có Long Plan accepted để xác nhận horizon.", code="missing_artifact"
+        )
+    accepted_revision = envelope.accepted_revision
+    if accepted_revision.planning_scope is not None:
+        return ActionResult(
+            operation_id=operation_id or generate_operation_id(),
+            artifact_id=LONG_PLAN_ARTIFACT_ID,
+            message="Long Plan accepted đã có `planning_scope`; không cần migrate.",
+            data={
+                "status": envelope.status.value,
+                "revision": accepted_revision.revision,
+                "planning_scope": {
+                    "start": int(accepted_revision.planning_scope.start),
+                    "end": int(accepted_revision.planning_scope.end),
+                },
+                "migrated": False,
+                "idempotent": True,
+            },
+            validation=accepted_revision.validation,
+        )
+
+    scope_dict = {"start": scope.start, "end": scope.end}
+    issues = horizon_issues(accepted_revision.payload, scope=scope_dict)
+    if issues:
+        raise GuardError(
+            "Horizon xác nhận không khớp coverage của Long Plan accepted; "
+            "regenerate plan cho horizon đó thay vì migrate.",
+            code="scope_does_not_cover_payload",
+            details={
+                "planning_scope": scope_dict,
+                "errors": [issue.model_dump(mode="json") for issue in issues],
+            },
+        )
+    op_id = operation_id or generate_operation_id()
+    updated = envelope.model_copy(deep=True)
+    updated.accepted_revision = accepted_revision.model_copy(
+        update={"planning_scope": scope}
+    )
+    storage.save_artifact(project, updated, operation_id=op_id)
+    return ActionResult(
+        operation_id=op_id,
+        artifact_id=LONG_PLAN_ARTIFACT_ID,
+        message=(
+            f"Đã xác nhận horizon {scope.start}–{scope.end} cho Long Plan accepted "
+            f"r{accepted_revision.revision} (payload không đổi)."
+        ),
+        data={
+            "status": updated.status.value,
+            "revision": accepted_revision.revision,
+            "planning_scope": scope_dict,
+            "migrated": True,
+        },
+        validation=accepted_revision.validation,
     )
 
 

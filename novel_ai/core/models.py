@@ -253,6 +253,24 @@ class ChapterRange(StrictModel):
         return self
 
 
+class PlanningScope(StrictModel):
+    """Horizon cấp truyện của một revision Long Plan (D017, `schemas.md` 1.3/3.1).
+
+    App-owned metadata: service ghi khi tạo candidate, Accept giữ nguyên. Không
+    phải field payload do LLM trả, không phải kích thước arc và không phải edit
+    window. `end` là endpoint chương, không bao giờ là số chương của một arc.
+    """
+
+    start: ChapterNumber
+    end: ChapterNumber
+
+    @model_validator(mode="after")
+    def _check_order(self) -> PlanningScope:
+        if self.start > self.end:
+            raise ValueError("planning_scope.start phải <= planning_scope.end")
+        return self
+
+
 class ValidationIssue(StrictModel):
     """Một lỗi validation có đường dẫn field. `path` dùng JSON Pointer."""
 
@@ -359,6 +377,9 @@ class ArtifactRevision(StrictModel, Generic[T]):
     #: App-owned: chỉ set cho candidate Short Plan/Skeleton chuẩn bị trước
     #: (`schemas.md` mục 4.1). Không do LLM trả và không đổi top-level payload.
     preparation_context: PreparationContext | None = None
+    #: App-owned: horizon của revision (D017, `schemas.md` mục 1.3). Chỉ Long Plan
+    #: dùng; artifact khác để `None`. File cũ thiếu field đọc ra `None` = legacy.
+    planning_scope: PlanningScope | None = None
 
 
 class ArtifactEnvelope(StrictModel, Generic[T]):
@@ -391,6 +412,11 @@ class ProjectConfig(StrictModel):
     project_id: str
     title: str
     default_language: str = "vi"
+    #: D016: default viết theo project, do user nhập. Rỗng = "chưa thiết lập",
+    #: không phải một default ngầm do app/model bịa. Override từng chương thắng
+    #: giá trị này cho request mới; đổi default không sửa accepted plan.
+    default_pov: str = ""
+    default_length_guidance: str = ""
     genre_prompt_id: str = "custom"
     writing_style_id: str = "default"
     current_chapter: ChapterNumber = 1

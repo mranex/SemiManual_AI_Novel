@@ -26,6 +26,7 @@ from pydantic import BaseModel, ValidationError
 
 from novel_ai.core import context as context_core
 from novel_ai.core import lifecycle, storage, validation
+from novel_ai.core.generation import EventSink, GenerationEmitter
 from novel_ai.core.models import (
     ARTIFACT_PAYLOAD_MODELS,
     ArtifactEnvelope,
@@ -48,6 +49,7 @@ from novel_ai.services.co_create import (
     complete_json,
     current_dependency_pins,
     foundation_reference_index,
+    generation_stage,
     parse_structured_or_fail,
     payload_source,
     require_base_idea,
@@ -257,6 +259,9 @@ def generate(
     user_instruction: str = "",
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Generate/regenerate/edit một foundation artifact qua LLM.
 
@@ -264,6 +269,7 @@ def generate(
     Rules/Foreshadow cần thêm Premise accepted và không stale. Output luôn là
     candidate (hoặc accepted ngay nếu Auto Accept bật và output hợp lệ).
     Accepted revision cũ không bị ghi đè khi LLM lỗi hoặc output sai schema.
+    `on_event` nhận `GenerationEvent` theo contract T33 (D019).
     """
     _require_foundation_type(artifact_type)
     if action not in _FOUNDATION_ACTIONS:
@@ -275,6 +281,18 @@ def generate(
         raise GuardError("`chapter_number` phải >= 1.", code="invalid_chapter_number")
     op_id = operation_id or generate_operation_id()
     warnings: list[str] = []
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action=f"architect.{artifact_type}.{action}",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=_FOUNDATION_PROMPT_IDS[artifact_type],
+            artifact_id=artifact_type,
+        )
+        if on_event is not None
+        else None
+    )
 
     require_base_idea(project)
     if artifact_type != "premise":
@@ -315,30 +333,33 @@ def generate(
         operation_id=op_id,
         now=now,
         label=artifact_type,
+        emitter=emitter,
+        stream=stream,
     )
-    parsed = parse_structured_or_fail(
-        project,
-        call=call,
-        model_cls=ARTIFACT_PAYLOAD_MODELS[artifact_type],
-        operation_id=op_id,
-        now=now,
-        label=artifact_type,
-        artifact_id=artifact_type,
-    )
-    result = validate_or_fail(
-        project,
-        artifact_type=artifact_type,
-        payload=parsed,
-        context=validation.ValidationContext(index=foundation_reference_index(project)),
-        operation_id=op_id,
-        now=now,
-        label=artifact_type,
-        raw_output_ref=call.raw_ref,
-        artifact_id=artifact_type,
-        extra_issues=_scope_issues(artifact_type, parsed, ids)
-        if artifact_type != "premise"
-        else (),
-    )
+    with generation_stage(emitter, detail=f"Đang parse/validate `{artifact_type}`."):
+        parsed = parse_structured_or_fail(
+            project,
+            call=call,
+            model_cls=ARTIFACT_PAYLOAD_MODELS[artifact_type],
+            operation_id=op_id,
+            now=now,
+            label=artifact_type,
+            artifact_id=artifact_type,
+        )
+        result = validate_or_fail(
+            project,
+            artifact_type=artifact_type,
+            payload=parsed,
+            context=validation.ValidationContext(index=foundation_reference_index(project)),
+            operation_id=op_id,
+            now=now,
+            label=artifact_type,
+            raw_output_ref=call.raw_ref,
+            artifact_id=artifact_type,
+            extra_issues=_scope_issues(artifact_type, parsed, ids)
+            if artifact_type != "premise"
+            else (),
+        )
 
     envelope = lifecycle.set_candidate(
         envelope,
@@ -352,6 +373,15 @@ def generate(
         project, envelope, artifact_type=artifact_type, result=result, now=now
     )
     storage.save_artifact(project, envelope, operation_id=op_id)
+    if emitter is not None:
+        emitter.saved(
+            detail=(
+                f"Đã auto accept `{artifact_type}` (validate xong theo config)."
+                if auto_accepted
+                else f"Candidate `{artifact_type}` đã lưu (chưa accept)."
+            ),
+            raw_ref=call.raw_ref,
+        )
 
     revision = (
         envelope.accepted_revision.revision

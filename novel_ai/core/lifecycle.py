@@ -40,6 +40,7 @@ from novel_ai.core.models import (
     ChapterStatus,
     DependencyPin,
     PayloadSource,
+    PlanningScope,
     PreparationContext,
     StaleReason,
     ValidationResult,
@@ -349,6 +350,7 @@ def set_candidate(
     dependency_pins: Iterable[DependencyPin] = (),
     validation: ValidationResult | None = None,
     preparation_context: PreparationContext | None = None,
+    planning_scope: PlanningScope | None = None,
     now: str | None = None,
 ) -> ArtifactEnvelope[Any]:
     """Đặt candidate mới, **giữ nguyên** accepted revision.
@@ -361,6 +363,9 @@ def set_candidate(
     (Short Plan/Skeleton dựng ở mode `provisional`, `schemas.md` mục 4.1). Nó nằm
     trong `ArtifactRevision` để guard accept đọc được **kể cả khi caller không
     truyền chapter metadata**.
+
+    ``planning_scope`` là metadata app-owned cho horizon Long Plan (D017). Accept
+    giữ nguyên giá trị này vì `accept_candidate` copy cả revision.
     """
     updated = envelope.model_copy(deep=True)
     current = updated.candidate_revision
@@ -379,6 +384,7 @@ def set_candidate(
         dependency_pins=list(dependency_pins),
         validation=validation or ValidationResult(),
         preparation_context=preparation_context,
+        planning_scope=planning_scope,
         created_at=now or now_iso(),
     )
     updated.status = ArtifactStatus.draft

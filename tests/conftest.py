@@ -1,4 +1,4 @@
-"""Fixture chung cho test offline (T07).
+"""Fixture chung cho test offline (T07, cô lập dotenv T26).
 
 Quy ước:
 
@@ -6,6 +6,13 @@ Quy ước:
   cho test dùng `tmp_path`.
 - Biến môi trường `NOVEL_AI_*` bị xoá trước mỗi test để shell/`.env` của máy
   không làm kết quả phụ thuộc môi trường, và để test không lỡ dùng API key thật.
+- **Dotenv trên disk cũng bị cô lập**: `novel_ai.config._dotenv_path` bị trỏ về
+  `tmp_path/.env` trong mọi test, nên `.env` thật ở repo root (có thể bật provider
+  thật) không bao giờ được đọc. Test nào muốn kiểm hành vi dotenv thì tự ghi
+  `tmp_path/.env` — đó chính là file mà suite đọc.
+- Cache `get_config()` bị xoá trước mỗi test để cấu hình của test có hiệu lực.
+- Mặc định vẫn là `FakeLLMClient`; đường provider thật chỉ chạy qua transport stub
+  trong `tests/unit/test_llm_adapter.py`, không có request mạng nào.
 """
 
 from __future__ import annotations
@@ -17,6 +24,7 @@ from typing import Any
 
 import pytest
 
+from novel_ai import config as config_module
 from novel_ai.config import AppConfig, get_config, load_config
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -24,6 +32,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #: không lệch nhau; `tests/fixtures/` chỉ chứa case bổ sung của T08 trở đi.
 DESIGN_EXAMPLES = REPO_ROOT / "docs" / "design" / "examples"
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+
+#: Hàm seam dotenv **thật** của production, lấy trước khi fixture autouse
+#: monkeypatch nó. Test cần kiểm hành vi mặc định dùng fixture `real_dotenv_path`.
+_REAL_DOTENV_PATH = config_module._dotenv_path
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -49,11 +61,21 @@ def t08_negative_cases() -> dict[str, Any]:
 
 
 @pytest.fixture(autouse=True)
-def isolate_novel_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Xoá mọi biến `NOVEL_AI_*` trước mỗi test."""
+def isolate_novel_ai_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Cô lập môi trường, dotenv trên disk và cache cấu hình cho mọi test.
+
+    Xoá biến `NOVEL_AI_*` là **chưa đủ**: `load_config(env=None)` còn đọc `.env`
+    thật ở repo root. Nếu máy đang cấu hình provider thật, test tưởng đang offline
+    vẫn dựng `OpenAICompatibleClient`. Vì vậy seam `_dotenv_path` được trỏ về
+    `tmp_path/.env` (mặc định không tồn tại) — test nào cần dotenv thì ghi chính
+    file đó.
+    """
     for name in list(os.environ):
         if name.startswith("NOVEL_AI_"):
             monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        config_module, "_dotenv_path", lambda root: tmp_path / ".env"
+    )
     # UI cache app config 1 lần; test phải bắt đầu từ cache sạch để env của test có hiệu lực.
     get_config.cache_clear()
 
@@ -61,6 +83,16 @@ def isolate_novel_ai_env(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def repo_root() -> Path:
     return REPO_ROOT
+
+
+@pytest.fixture
+def real_dotenv_path():
+    """Hàm `novel_ai.config._dotenv_path` của production (chưa bị monkeypatch).
+
+    Dùng để kiểm mặc định thật (`<root>/.env`) trong khi phần còn lại của suite
+    chạy trên seam đã bị chuyển sang `tmp_path`.
+    """
+    return _REAL_DOTENV_PATH
 
 
 @pytest.fixture

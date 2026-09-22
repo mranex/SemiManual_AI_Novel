@@ -32,21 +32,24 @@ Luật đã giữ trong module:
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from pydantic import BaseModel
 
 from novel_ai.core import context as context_core
 from novel_ai.core import lifecycle, storage, validation
+from novel_ai.core.generation import TERMINAL_STATES, EventSink, GenerationEmitter
 from novel_ai.core.llm import (
     LLMError,
     LLMRequest,
     StructuredOutputParseError,
     parse_structured_text,
+    stream_text as llm_stream_text,
 )
 from novel_ai.core.models import (
     ArtifactEnvelope,
@@ -77,10 +80,14 @@ from novel_ai.services import (
 __all__ = [
     "BASE_IDEA_MARKDOWN_RELPATH",
     "CO_CREATE_PROMPT_ID",
+    "complete_json",
     "finalize_base_idea",
+    "generation_stage",
     "render_base_idea_markdown",
     "run_turn",
     "set_working_state",
+    "structured_transport",
+    "transport_complete_seam",
 ]
 
 #: Prompt co-create đã đăng ký trong manifest v1.
@@ -309,6 +316,14 @@ class StructuredCall:
     prompt_hash: str
 
 
+@dataclass(frozen=True)
+class TransportResult:
+    """Kết quả phần transport: text đã nhận và `raw_ref` của raw output đã lưu."""
+
+    text: str
+    raw_ref: str
+
+
 def load_prompt_registry() -> PromptRegistry:
     """Load manifest prompt v1; lỗi load là `ServiceError` có `code` ổn định."""
     try:
@@ -380,6 +395,147 @@ def save_structured_error(
     return relpath
 
 
+def structured_transport(
+    project: Project,
+    *,
+    client: Any,
+    request: LLMRequest,
+    operation_id: str,
+    label: str,
+    emitter: GenerationEmitter | None = None,
+    stream: bool = False,
+    now: str | None = None,
+    prompt_id: str | None = None,
+) -> TransportResult:
+    """Phần **transport** dùng chung cho mọi structured call (T33/T35, D019).
+
+    Phát `connecting → streaming|non_streaming → (delta) → transport_complete` khi có
+    `emitter`; lưu raw output và trả `(text, raw_ref)`.
+
+    Structured JSON nhận qua stream **chỉ là raw preview**: hàm cộng dồn text, và nếu
+    stream không kết thúc `completed` (đứt/timeout/`finish_reason` cắt) thì lưu raw
+    partial + error record, phát `partial`, rồi raise — **không** parse, không tạo
+    candidate. Phần `validating → saved|invalid` do service phát tiếp qua
+    `generation_stage`.
+    """
+    prompt_label = prompt_id or label
+    use_stream = bool(stream) and callable(getattr(client, "stream", None))
+    if emitter is not None:
+        if use_stream:
+            emitter.start_streaming(detail=f"Đang stream structured output cho `{label}`.")
+        else:
+            emitter.start_non_streaming(
+                detail=(
+                    "Provider/client không stream cho structured output: chạy "
+                    "non-streaming và không có delta."
+                    if stream
+                    else "Chạy non-streaming cho structured output."
+                )
+            )
+
+    if use_stream:
+        collected: list[str] = []
+        stream_status = "partial"
+        try:
+            for chunk in llm_stream_text(client, request):
+                if chunk.status == "delta":
+                    collected.append(chunk.text)
+                    if emitter is not None:
+                        emitter.delta(chunk.text)
+                    continue
+                stream_status = chunk.status
+                break
+        except LLMError as exc:
+            if not collected:
+                if emitter is not None:
+                    emitter.fail(detail="Stream lỗi trước khi có dữ liệu.")
+                error_ref = save_llm_error(
+                    project, operation_id=operation_id, error=exc, now=now, label=label
+                )
+                raise LLMUnavailableError(
+                    f"LLM không khả dụng khi gọi `{prompt_label}` (code `{exc.code}`): {exc}",
+                    code=exc.code,
+                    details={"prompt_id": prompt_label, "error_ref": error_ref},
+                ) from exc
+            stream_status = "partial"
+        text = "".join(collected)
+        if stream_status != "completed":
+            partial_ref = storage.save_raw_output(
+                project,
+                operation_id=operation_id,
+                text=text,
+                label=f"{label}.partial",
+                day=raw_day(now),
+            )
+            error = LLMError(
+                f"Stream structured output kết thúc với status `{stream_status}`; "
+                "raw partial đã được lưu và **không** parse/validate payload dở.",
+                code=f"stream_{stream_status}",
+                details={"raw_output_ref": partial_ref, "stream_status": stream_status},
+            )
+            error_ref = save_llm_error(
+                project, operation_id=operation_id, error=error, now=now, label=label
+            )
+            if emitter is not None:
+                # Stream đứt là terminal: partial, không mở đường validate/saved.
+                emitter.emit(
+                    "partial",
+                    detail=(
+                        f"Stream structured output `{stream_status}`: không parse, "
+                        "không tạo candidate."
+                    ),
+                    raw_ref=partial_ref,
+                )
+            raise LLMUnavailableError(
+                f"Structured output của `{prompt_label}` không hoàn tất (`{stream_status}`); "
+                "raw partial đã lưu, accepted state giữ nguyên.",
+                code=f"stream_{stream_status}",
+                details={"raw_output_ref": partial_ref, "error_ref": error_ref},
+            )
+        if emitter is not None:
+            emitter.transport_complete(detail="Đã nhận xong structured output (chưa parse).")
+    else:
+        try:
+            response = client.complete(request)
+        except LLMError as exc:
+            partial = getattr(exc, "raw_text", "") or ""
+            partial_ref = None
+            if partial:
+                partial_ref = storage.save_raw_output(
+                    project,
+                    operation_id=operation_id,
+                    text=partial,
+                    label=f"{label}.partial",
+                    day=raw_day(now),
+                )
+            error_ref = save_llm_error(
+                project, operation_id=operation_id, error=exc, now=now, label=label
+            )
+            if emitter is not None:
+                emitter.fail(detail="LLM lỗi trước khi có structured output dùng được.")
+            raise LLMUnavailableError(
+                f"LLM không khả dụng khi gọi `{prompt_label}` (code `{exc.code}`): {exc}",
+                code=exc.code,
+                details={
+                    "prompt_id": prompt_label,
+                    "raw_output_ref": partial_ref,
+                    "error_ref": error_ref,
+                },
+            ) from exc
+        text = response.text if isinstance(response.text, str) else str(response.text)
+        if emitter is not None:
+            emitter.transport_complete(detail="Đã nhận xong response (chưa parse/validate).")
+
+    raw_ref = storage.save_raw_output(
+        project,
+        operation_id=operation_id,
+        text=text,
+        label=label,
+        day=raw_day(now),
+    )
+    return TransportResult(text=text, raw_ref=raw_ref)
+
+
 def complete_json(
     project: Project,
     *,
@@ -389,11 +545,17 @@ def complete_json(
     operation_id: str,
     now: str | None = None,
     label: str = "output",
+    emitter: GenerationEmitter | None = None,
+    stream: bool = False,
 ) -> StructuredCall:
     """Gọi LLM một lần và lưu raw output trước khi parse.
 
     Lỗi provider/timeout được đổi thành `LLMUnavailableError`; raw (nếu provider
     kịp trả) và error record được lưu lại, accepted state không đổi.
+
+    T34/D019: khi có `emitter`, hàm phát phần **transport** của contract generation
+    (`connecting → streaming|non_streaming → transport_complete`) qua
+    `structured_transport`. Phần `validating → saved|invalid` do service phát tiếp.
     """
     rendered = render_service_prompt(project, prompt_id, bundle.payload)
     request = LLMRequest(
@@ -403,47 +565,90 @@ def complete_json(
         prompt_version=rendered.prompt_version,
         prompt_hash=rendered.template_hash,
     )
-    try:
-        response = client.complete(request)
-    except LLMError as exc:
-        partial = getattr(exc, "raw_text", "") or ""
-        partial_ref = None
-        if partial:
-            partial_ref = storage.save_raw_output(
-                project,
-                operation_id=operation_id,
-                text=partial,
-                label=f"{label}.partial",
-                day=raw_day(now),
-            )
-        error_ref = save_llm_error(
-            project, operation_id=operation_id, error=exc, now=now, label=label
-        )
-        raise LLMUnavailableError(
-            f"LLM không khả dụng khi gọi `{prompt_id}` (code `{exc.code}`): {exc}",
-            code=exc.code,
-            details={
-                "prompt_id": prompt_id,
-                "raw_output_ref": partial_ref,
-                "error_ref": error_ref,
-            },
-        ) from exc
-
-    text = response.text if isinstance(response.text, str) else str(response.text)
-    raw_ref = storage.save_raw_output(
+    transport = structured_transport(
         project,
+        client=client,
+        request=request,
         operation_id=operation_id,
-        text=text,
         label=label,
-        day=raw_day(now),
+        emitter=emitter,
+        stream=stream,
+        now=now,
+        prompt_id=prompt_id,
     )
     return StructuredCall(
-        text=text,
-        raw_ref=raw_ref,
+        text=transport.text,
+        raw_ref=transport.raw_ref,
         prompt_id=rendered.prompt_id,
         prompt_version=rendered.prompt_version,
         prompt_hash=rendered.template_hash,
     )
+
+
+def transport_complete_seam(
+    project: Project,
+    *,
+    client: Any,
+    operation_id: str,
+    label: str,
+    emitter: GenerationEmitter | None = None,
+    stream: bool = False,
+    now: str | None = None,
+    prompt_id: str | None = None,
+) -> tuple[Callable[[LLMRequest], str], dict[str, str]]:
+    """Seam `complete` cho `core.llm.generate_structured` (T35).
+
+    Trả `(complete_fn, holder)`; `holder["raw_ref"]` là raw output đã lưu bởi
+    `structured_transport`. Nhờ vậy reconcile/impact report dùng chung một đường
+    transport (có event + raw/partial + stream) mà không phải viết lại vòng
+    parse/repair của `generate_structured`.
+    """
+    holder: dict[str, str] = {}
+
+    def _complete(request: LLMRequest) -> str:
+        result = structured_transport(
+            project,
+            client=client,
+            request=request,
+            operation_id=operation_id,
+            label=label,
+            emitter=emitter,
+            stream=stream,
+            now=now,
+            prompt_id=prompt_id,
+        )
+        holder["raw_ref"] = result.raw_ref
+        return result.text
+
+    return _complete, holder
+
+
+@contextmanager
+def generation_stage(
+    emitter: GenerationEmitter | None, *, detail: str = ""
+) -> Iterator[None]:
+    """Bọc bước parse/validate: phát `validating`, và terminal khi bước này fail.
+
+    - `ValidationFailure` (schema/scope sai) ⇒ `invalid` + re-raise;
+    - lỗi khác ⇒ `error` + re-raise.
+
+    Chỉ phát khi chưa có terminal event, để không che lỗi gốc.
+    """
+    if emitter is None:
+        yield
+        return
+    emitter.validating(detail=detail)
+    try:
+        yield
+    except ValidationFailure as exc:
+        if emitter.current not in TERMINAL_STATES:
+            emitter.invalid(detail=f"Output không qua validation: {exc}")
+        raise
+    except Exception:
+        if emitter.current not in TERMINAL_STATES:
+            emitter.fail(detail="Lỗi khi xử lý output generation; state cũ giữ nguyên.")
+        raise
+
 
 
 def parse_structured_or_fail(
@@ -605,6 +810,9 @@ def run_turn(
     user_message: str,
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Chạy một lượt co-create và cập nhật working state.
 
@@ -614,6 +822,7 @@ def run_turn(
 
     Lỗi LLM: raw/error được lưu, working state không đổi, raise
     `LLMUnavailableError`. Output sai schema: raise `ValidationFailure`.
+    `on_event` nhận `GenerationEvent` theo contract T33 (D019).
     """
     text_message = str(user_message or "").strip()
     if not text_message:
@@ -621,6 +830,18 @@ def run_turn(
     op_id = operation_id or generate_operation_id()
     document = _document(project)
     _require_working(document)
+    emitter = (
+        GenerationEmitter(
+            operation_id=op_id,
+            action="co_create",
+            sink=on_event,
+            attempt=attempt,
+            prompt_id=CO_CREATE_PROMPT_ID,
+            artifact_id="co_create",
+        )
+        if on_event is not None
+        else None
+    )
 
     try:
         bundle = context_core.build_co_create_context(project, user_message=text_message)
@@ -635,16 +856,19 @@ def run_turn(
         operation_id=op_id,
         now=now,
         label="co_create",
+        emitter=emitter,
+        stream=stream,
     )
-    parsed: IdeaStateResponse = parse_structured_or_fail(
-        project,
-        call=call,
-        model_cls=IdeaStateResponse,
-        operation_id=op_id,
-        now=now,
-        label="co_create",
-        artifact_id="co_create",
-    )
+    with generation_stage(emitter, detail="Đang parse/validate working idea state."):
+        parsed: IdeaStateResponse = parse_structured_or_fail(
+            project,
+            call=call,
+            model_cls=IdeaStateResponse,
+            operation_id=op_id,
+            now=now,
+            label="co_create",
+            artifact_id="co_create",
+        )
 
     stamp_value = stamp(now)
     document.messages = [
@@ -655,6 +879,10 @@ def run_turn(
     document.idea_state = parsed.idea_state
     document.status = CoCreateStatus.working
     storage.save_co_create(project, document, operation_id=f"{op_id}.co_create")
+    if emitter is not None:
+        emitter.saved(
+            detail="Working idea state đã cập nhật (chưa phải canon).", raw_ref=call.raw_ref
+        )
 
     return ActionResult(
         operation_id=op_id,

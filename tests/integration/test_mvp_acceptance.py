@@ -672,6 +672,8 @@ def test_accepting_short_plan_does_not_write_actual_state(
     )
     timeline_before_fingerprint = storage.file_fingerprint(project.paths.timeline_json)
     latest_final_before = storage.load_timeline(project).latest_final_chapter
+    # D016: request Short Plan cần contract viết đủ; seed default viết của project.
+    project.update_config(default_pov="ngôi ba giới hạn", default_length_guidance="1500 từ")
 
     short_planner.generate(
         project,

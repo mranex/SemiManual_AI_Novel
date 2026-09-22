@@ -43,6 +43,7 @@ dist/
 .coverage
 htmlcov/
 manual_ai_novel.egg-info/
+tests/
 
 # Editor/OS
 .vscode/

@@ -148,6 +148,48 @@ def test_not_wired_message_is_honest_about_missing_behaviour() -> None:
     assert "chưa có hành vi nào chạy được" in layout.WORKSPACE_NOT_WIRED_TEMPLATE
 
 
+def test_navigate_to_workspace_syncs_both_keys_and_ignores_unknown_workspace(
+    tmp_path: Path,
+) -> None:
+    """Helper điều hướng dùng chung (T28): đồng bộ cả hai key, bỏ qua id lạ.
+
+    Chạy qua AppTest để có session state thật; helper không tạo widget nào nên gán
+    key ở đây hợp lệ (đây chính là đường được `on_click` của nút Arbiter dùng).
+    """
+    script = tmp_path / "nav_probe.py"
+    script.write_text(
+        _NAV_PROBE_SCRIPT.format(repo_root=str(REPO_ROOT)), encoding="utf-8"
+    )
+
+    at = AppTest.from_file(str(script))
+    at.run(timeout=60)
+
+    assert not at.exception
+    rendered = " ".join(str(element.value) for element in at.markdown)
+    # (workspace, nav) sau lần gọi hợp lệ, rồi workspace sau lần gọi id lạ.
+    assert "probe=('skeleton', 'Skeleton', 'skeleton')" in rendered
+
+
+_NAV_PROBE_SCRIPT = '''\
+"""Script tạm cho AppTest: gọi trực tiếp helper điều hướng của T28."""
+import sys
+
+sys.path.insert(0, {repo_root!r})
+
+import streamlit as st
+
+from novel_ai.ui import layout
+
+layout.navigate_to_workspace("skeleton")
+after_valid = (
+    st.session_state.get(layout.KEY_WORKSPACE),
+    st.session_state.get(layout.KEY_WORKSPACE_NAV),
+)
+layout.navigate_to_workspace("khong_ton_tai")
+st.markdown("probe=" + repr(after_valid + (st.session_state.get(layout.KEY_WORKSPACE),)))
+'''
+
+
 _ROUTER_PROBE_SCRIPT = '''\
 """Script tạm cho AppTest: gọi router của T19 với page chưa tồn tại."""
 import sys
