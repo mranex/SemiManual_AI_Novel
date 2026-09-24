@@ -2,7 +2,7 @@
 
 Phiên bản nội dung: foundation refresh 2026-09-19; planning refresh theo yêu cầu tác giả 2026-09-20. Giữ prompt ID v1 và payload T02/T05. Phụ thuộc: `schemas.md`, `context.md`, `storage.md`, `workflow.md`.
 
-Catalog này đăng ký toàn bộ prompt MVP; manifest máy đọc nằm tại `docs/prompts/v1/manifest.json` (T06). Prompt cũ trong `docs/prompts/` chỉ là reference. T10 sẽ triển khai loader theo manifest explicit, không fallback sang prompt cũ.
+Catalog này mô tả bộ prompt MVP; manifest máy đọc nằm tại `docs/prompts/v1/manifest.json`. Loader chỉ dùng manifest explicit. Bộ prompt tham khảo cũ đã được dọn khỏi repo.
 
 ## 1. Luật chung cho prompt v1
 
@@ -537,9 +537,9 @@ Mẫu stage co-create là tham khảo cho T05: hướng tương lai phải tôn 
 
 ### 6.5. Nguồn chắt lọc
 
-- `docs/references/differentiation.md`: khác biệt ở động cơ, thế giới và quan hệ; bỏ yêu cầu áp số lượng phản mẫu cứng.
-- `docs/references/character-building.md`: động cơ, phản ứng dưới áp lực và giọng nói; không bắt mọi người có trauma/khuyết điểm chí mạng.
-- `docs/prompts/architect-short.md`: hạt nhân tập trung, kiểm soát quy mô; không chuyển giao thức công cụ, outline cũ hoặc schema cũ.
+- Nguồn differentiation cũ (đã dọn): khác biệt ở động cơ, thế giới và quan hệ; bỏ yêu cầu áp số lượng phản mẫu cứng.
+- Nguồn character-building cũ (đã dọn): động cơ, phản ứng dưới áp lực và giọng nói; không bắt mọi người có trauma/khuyết điểm chí mạng.
+- Prompt architect-short cũ (đã dọn): hạt nhân tập trung, kiểm soát quy mô; không chuyển giao thức công cụ, outline cũ hoặc schema cũ.
 - Mẫu Co-create do tác giả cung cấp trong phiên nâng cấp: tích lũy brief và gợi ý câu nói tiếp; áp dụng qua JSON hiện hữu như mục 6.2.
 
 Các nguồn trên chỉ được đọc khi biên soạn; không phải dependency runtime cần model tự mở. Không sửa tài liệu reference cũ.
@@ -597,10 +597,10 @@ Script dùng standard library, đọc fixture/JSON blocks/catalog, đối chiế
 
 ### 7.5. Reference chắt lọc
 
-- [longform-planning](../references/longform-planning.md): mục tiêu–lực cản–đánh đổi cấp volume/arc, thay loại vấn đề thay vì chỉ nâng sức mạnh.
-- [chapter-guide](../references/chapter-guide.md): chuỗi áp lực–lựa chọn–hệ quả, bỏ tỷ lệ mở đầu bắt buộc.
-- [hook-techniques](../references/hook-techniques.md): nhiều dạng hook, không bắt chương nào cũng cliffhanger/reveal.
-- [dialogue-writing](../references/dialogue-writing.md): mục tiêu, né tránh và giọng nhân vật; Skeleton mô tả chức năng đối thoại, không sinh prose.
+- longform-planning (nguồn tham khảo cũ đã dọn): mục tiêu–lực cản–đánh đổi cấp volume/arc, thay loại vấn đề thay vì chỉ nâng sức mạnh.
+- chapter-guide (nguồn tham khảo cũ đã dọn): chuỗi áp lực–lựa chọn–hệ quả, bỏ tỷ lệ mở đầu bắt buộc.
+- hook-techniques (nguồn tham khảo cũ đã dọn): nhiều dạng hook, không bắt chương nào cũng cliffhanger/reveal.
+- dialogue-writing (nguồn tham khảo cũ đã dọn): mục tiêu, né tránh và giọng nhân vật; Skeleton mô tả chức năng đối thoại, không sinh prose.
 
 Reference chỉ dùng khi biên soạn; không có dependency runtime hoặc lệnh model mở chúng. Không thay prompt/reference cũ.
 
@@ -610,12 +610,12 @@ Theo phản hồi tác giả rằng bản đầu chưa đủ hướng dẫn AI v
 
 | Nguồn đã đọc trong docs/prompts | Phần chắt lọc | Cách áp dụng trong v1 |
 |---|---|---|
-| [architect-long.md](../prompts/architect-long.md) | Lời hứa độc giả, động cơ duy trì truyện, chức năng volume/arc, đổi loại xung đột, mật độ theo độ dài, tránh kết quá sớm/kéo dài | Long Plan có phương pháp thiết kế 6 bước, mapping vào field hiện hữu; Short Plan phân phối tải sự kiện và phản ứng. Không mang quy định hai volume/tối thiểu tám chương, compass hoặc tự kết sách. |
-| [architect-short.md](../prompts/architect-short.md) | Tập trung xung đột, kiểm soát cast/lore, nhân quả và hồi đáp | Dùng để làm rõ phạm vi range/chapter và chống phình kế hoạch. Không biến Short Plan thành chế độ truyện ngắn, không dùng outline phẳng cũ. |
-| [writer.md](../prompts/writer.md) | Chapter contract, không nén mất phần đệm, độ dài là đầu vào thiết kế, tiêu đề cụ thể, continuity | Chuyển trách nhiệm thiết kế sang Short Plan/Skeleton; phân biệt việc chốt intent với khoảng tự do câu chữ của Writer. Không mang quyền Writer bỏ beat/đổi intent, tự plan hoặc commit. |
-| [editor.md](../prompts/editor.md) | Kiểm tra động cơ, pacing, continuity, quan hệ không nhảy bậc, không phạt chương chuyển tiếp máy móc | Rà chất lượng candidate một lượt trong prompt; không thêm bảng điểm, review service hoặc audit loop. |
-| [revision-analyze.md](../prompts/revision-analyze.md) | Bằng chứng actual, chỉ báo impact khi có ảnh hưởng, không khôi phục sự kiện đã bị bỏ | Rolling phân loại sai lệch, thiếu bằng chứng, điểm phụ thuộc đầu tiên và patch tối thiểu nhưng đủ. Không mang schema facts/retcon hoặc đảo authority. |
-| [arbiter-plan-start.md](../prompts/arbiter-plan-start.md) | Đã đối chiếu giao thức và cách chọn planner | Không áp router theo truyện dài/ngắn hoặc lệnh công cụ vào pipeline v1. |
+| architect-long.md (nguồn cũ đã dọn) | Lời hứa độc giả, động cơ duy trì truyện, chức năng volume/arc, đổi loại xung đột, mật độ theo độ dài, tránh kết quá sớm/kéo dài | Long Plan có phương pháp thiết kế 6 bước, mapping vào field hiện hữu; Short Plan phân phối tải sự kiện và phản ứng. Không mang quy định hai volume/tối thiểu tám chương, compass hoặc tự kết sách. |
+| architect-short.md (nguồn cũ đã dọn) | Tập trung xung đột, kiểm soát cast/lore, nhân quả và hồi đáp | Dùng để làm rõ phạm vi range/chapter và chống phình kế hoạch. Không biến Short Plan thành chế độ truyện ngắn, không dùng outline phẳng cũ. |
+| writer.md (nguồn cũ đã dọn) | Chapter contract, không nén mất phần đệm, độ dài là đầu vào thiết kế, tiêu đề cụ thể, continuity | Chuyển trách nhiệm thiết kế sang Short Plan/Skeleton; phân biệt việc chốt intent với khoảng tự do câu chữ của Writer. Không mang quyền Writer bỏ beat/đổi intent, tự plan hoặc commit. |
+| editor.md (nguồn cũ đã dọn) | Kiểm tra động cơ, pacing, continuity, quan hệ không nhảy bậc, không phạt chương chuyển tiếp máy móc | Rà chất lượng candidate một lượt trong prompt; không thêm bảng điểm, review service hoặc audit loop. |
+| revision-analyze.md (nguồn cũ đã dọn) | Bằng chứng actual, chỉ báo impact khi có ảnh hưởng, không khôi phục sự kiện đã bị bỏ | Rolling phân loại sai lệch, thiếu bằng chứng, điểm phụ thuộc đầu tiên và patch tối thiểu nhưng đủ. Không mang schema facts/retcon hoặc đảo authority. |
+| arbiter-plan-start.md (nguồn cũ đã dọn) | Đã đối chiếu giao thức và cách chọn planner | Không áp router theo truyện dài/ngắn hoặc lệnh công cụ vào pipeline v1. |
 
 Mỗi prompt hiện có một JSON ví dụ ngay trong file: ArcPlan, ChapterPlan, RollingPatchPayload hoặc SkeletonSection; các ví dụ fragment ghi rõ vị trí trong payload. Chúng là mẫu dạy cách diễn đạt cụ thể, không phải input truyện thật, không phải quyền thay accepted plan. Short Plan/Rolling đã nêu đầy đủ field RelationshipDirection ngay trong prompt để model không cần đọc prompt khác. Catalog/fixture vẫn dành cho tích hợp và kiểm tra, không phải dependency model phải tự mở.
 
@@ -679,7 +679,7 @@ Script rà manifest/catalog/schema section/link, mọi JSON example v1/catalog v
 
 ### 8.5. Nâng cấp Writer theo phản hồi tác giả — 2026-09-20
 
-Đọc lại 14 prompt gốc trực tiếp trong docs/prompts (không dùng v1 làm nguồn tham khảo thay bản gốc), đặc biệt writer.md và editor.md; đối chiếu quyền Writer trong spec cùng SkeletonPayload/projection hiện hành. Writer v1 được mở rộng phần hướng dẫn sáng tác, giữ nguyên input registry, output Markdown, schema và manifest.
+Trong T06, nhóm đã đọc 14 prompt gốc (hiện đã dọn khỏi repo), đặc biệt writer.md và editor.md, rồi đối chiếu quyền Writer trong spec cùng SkeletonPayload/projection. Writer v1 được mở rộng hướng dẫn sáng tác nhưng giữ nguyên input registry, output Markdown, schema và manifest.
 
 | Phần trong prompt gốc | Cách chuyển sang Writer phụ thuộc Skeleton |
 |---|---|

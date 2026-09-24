@@ -10,7 +10,7 @@ Tài liệu này liệt kê lỗi thực tế của app, nguyên nhân và cách
 - [Nhóm 4 — Guard chặn action](#nhóm-4--guard-chặn-action)
 - [Nhóm 5 — Transaction, pending và recovery](#nhóm-5--transaction-pending-và-recovery)
 - [Nhóm 6 — Stale và retcon](#nhóm-6--stale-và-retcon)
-- [Nhóm 7 — UI và Streamlit](#nhóm-7--ui-và-streamlit)
+- [Nhóm 7 — WebUI](#nhóm-7--webui)
 - [Nhóm 8 — Test](#nhóm-8--test)
 - [Khi cần xem trực tiếp dữ liệu](#khi-cần-xem-trực-tiếp-dữ-liệu)
 
@@ -207,38 +207,26 @@ Các thông báo dưới đây là **guard backend** — chúng chặn cả khi 
 - **Xử lý**: review/reaccept những artifact thực sự không bị ảnh hưởng. Đây là hạn chế đã ghi nhận,
   không phải dữ liệu sai.
 
-## Nhóm 7 — UI và Streamlit
+## Nhóm 7 — WebUI
 
 ### App không thấy thay đổi tôi vừa ghi bằng tay
 
-- Cây project có selectbox **Node đang xem** và app đọc lại state từ file mỗi lần render; chỉ cần
-  đổi workspace hoặc bấm bất kỳ widget nào để rerun. State bền nằm ở file project;
-  `st.session_state` chỉ giữ UI working state và không tự theo dõi thay đổi ngoài app.
+- WebUI giữ working copy ở trình duyệt, còn state bền ở file project. Tải lại trang để lấy state mới.
+  Không sửa JSON thủ công khi app đang mở; nếu project báo recovery/read-only, xử lý banner trước.
 
 ### Sửa `.env` nhưng app không đổi hành vi
 
-- App config được cache một lần cho mỗi phiên UI. **Khởi động lại** app.
+- **Khởi động lại** server Python để nạp lại cấu hình.
 
 ### Thông báo kết quả action hiện ở workspace khác
 
-- Từ T25 kết quả action được scope **theo workspace** (`action_result_key(workspace)`), nên không còn
-  rò sang workspace khác. Kết quả vẫn chỉ hiển thị **một lần**: page đọc rồi xóa khỏi session state.
-- Nếu bạn đổi workspace ngay sau khi bấm action, quay lại workspace đó để xem thông báo; state thật
-  vẫn kiểm được trong cây project. Bấm lại action là idempotent nên không tạo revision trùng.
-
-### Bố cục màn hình khác mô tả trong spec mục 28
-
-- Kiểm tra `.streamlit/config.toml` còn dòng `[client] showSidebarNavigation = false`. Nếu thiếu,
-  Streamlit sẽ dựng nav multipage riêng từ `novel_ai/pages/` và làm sai bố cục (sidebar hiện danh
-  sách file `.py`, tên trang thành `app`).
-- Asset CSS của shell nằm trong `novel_ai/ui/layout.py::main_css` và chỉ đụng khung (`header`,
-  `stDecoration`, `stToolbar`, `.block-container`, khối status bar). Nếu bạn thêm CSS/theme ngoài,
-  giữ nguyên các selector đó.
+- Quay lại workspace đã chạy action để xem transcript. Nếu vừa tải lại trang, dùng cây project và
+  trạng thái candidate/accepted để kiểm kết quả đã lưu. Không bấm generate lại chỉ vì transcript
+  không còn trên màn hình.
 
 ### Nút action bị `disabled`
 
-- `disabled` chỉ là guard ở UI (ví dụ thiếu LLM client hoặc registry). Backend **vẫn** là nơi chặn
-  thật; nếu action chạy được bằng bàn phím, service sẽ từ chối kèm lý do thay vì làm hỏng state.
+- Backend là nơi chặn thật. Xem banner và thông báo lỗi trong workspace để biết điều kiện còn thiếu.
 
 ## Nhóm 8 — Test
 
@@ -258,11 +246,6 @@ python -m pip install -e ".[dev]"
   mỗi test, nhưng nếu bạn chạy test bằng process khác thì cấu hình ngoài vẫn có thể ảnh hưởng.
 - Test dùng `tmp_path`, không đụng `projects/` thật. Nếu bạn thấy test ghi vào `projects/`, đó là bug
   cần báo lại.
-
-### 1 test bị skipped
-
-- `tests/unit/test_layout_router.py` có case "page chưa nối" tự skip vì mọi workspace đã được nối.
-  Đây là skip có điều kiện, không phải test bị bỏ quên.
 
 ## Khi cần xem trực tiếp dữ liệu
 

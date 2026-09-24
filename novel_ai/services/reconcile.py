@@ -161,7 +161,8 @@ def _retcon_marker(project: Project, chapter_id: str) -> dict[str, Any] | None:
     if not target.is_file():
         return None
     try:
-        return read_json(target)
+        marker = read_json(target)
+        return marker if isinstance(marker, dict) and marker.get("status") == "open" else None
     except Exception:  # pragma: no cover - marker hỏng không được chặn finalize
         return None
 
@@ -1444,6 +1445,7 @@ def _commit_reconciliation(
         pins=_dependency_pins(project, chapter_id=chapter.chapter_id),
         now=now,
     )
+    retcon_marker = _retcon_marker(project, chapter.chapter_id) if not refresh else None
     try:
         # Thứ tự commit (bất biến "chapter chỉ `final_reconciled` khi commit xong"):
         # 1. final manuscript prose
@@ -1476,6 +1478,11 @@ def _commit_reconciliation(
                     project.paths.snapshots_dir / f"snapshot_{chapter.chapter_id}_reconcile_r{final_revision_number:04d}.json",
                 ),
                 snapshot,
+            )
+        if retcon_marker is not None:
+            handle.add_json(
+                f"chapters/{chapter.chapter_id}/retcon/state.json",
+                {**retcon_marker, "status": "committed", "final_revision": final_revision_number},
             )
         handle.add_json(
             _project_relpath(project, project.paths.chapter_json(chapter.chapter_id)),
@@ -1717,6 +1724,9 @@ def retry_reconcile(
     chapter_id: str,
     operation_id: str | None = None,
     now: str | None = None,
+    on_event: EventSink | None = None,
+    stream: bool = False,
+    attempt: int = 1,
 ) -> ActionResult:
     """Retry reconciliation: idempotent, **không** generate lại prose.
 
@@ -1749,7 +1759,8 @@ def retry_reconcile(
             },
         )
     result = generate_reconciliation(
-        project, client=client, chapter_id=chapter_id, operation_id=op_id, now=now
+        project, client=client, chapter_id=chapter_id, operation_id=op_id, now=now,
+        on_event=on_event, stream=stream, attempt=attempt,
     )
     result.message = "Retry reconcile (không generate lại prose): " + result.message
     return result

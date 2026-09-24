@@ -2,7 +2,7 @@
 
 Module này **thuần Python**: không import Streamlit, không giữ state bền và không
 gọi mạng. Service/adapter phát `GenerationEvent`; UI (page hoặc
-`novel_ai.ui.generation`) render bằng primitive Streamlit.
+React WebUI hiển thị qua HTTP SSE; event không phụ thuộc transport.
 
 Luật quan trọng nhất của contract:
 

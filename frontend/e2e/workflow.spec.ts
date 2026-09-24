@@ -1,0 +1,106 @@
+import { test, expect } from '@playwright/test'
+import { mkdir } from 'node:fs/promises'
+import { resolve } from 'node:path'
+
+test('recovery persists across reload; two chapters reconcile, then revision is explicit', async ({ page, request }) => {
+  const imageDir = resolve('../docs/design/b08-screenshots')
+  await mkdir(imageDir, { recursive: true })
+  async function capture(name: string) {
+    for (const [width, height] of [[1366, 768], [1600, 900], [1920, 1080]]) {
+      await page.setViewportSize({ width, height })
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await page.screenshot({ path: resolve(imageDir, `${name}-${width}x${height}.png`) })
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
+      expect(overflow, `horizontal overflow at ${width}`).toBe(false)
+    }
+  }
+  await page.goto('/')
+  const project = page.getByRole('combobox', { name: 'Project' })
+  await project.selectOption({ label: 'E2E Recovery' })
+  await expect(page.getByRole('alert').filter({ hasText: 'Project cần recovery' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('alert').filter({ hasText: 'Project cần recovery' })).toBeVisible()
+  await capture('recovery')
+  await page.getByRole('button', { name: 'Mở Recovery' }).click()
+  await expect(page.getByRole('button', { name: 'Chạy recovery' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Chạy recovery' }).click()
+  await expect(page.getByText('Không có transaction chờ recovery.')).toBeVisible()
+
+  await project.selectOption({ label: 'Nồi Canh Bên Đường' })
+  const projects = await (await request.get('/api/v1/projects')).json()
+  const projectId = projects.data.projects.find((row: { title: string }) => row.title === 'Nồi Canh Bên Đường').project_id
+  const chapter = async (id: string) => (await (await request.get(`/api/v1/projects/${projectId}/chapters/${id}`)).json()).data
+  const workspace = async (name: string) => page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name }).click()
+  const selectChapter = async (id: string) => page.getByRole('combobox', { name: 'Chương' }).selectOption(id)
+
+  await workspace('Writer')
+  await selectChapter('ch_0002')
+  await page.getByRole('button', { name: 'Chạy Writer' }).click()
+  const guardError = page.getByRole('alert').filter({ hasText: /chapter|chương/i })
+  await expect(guardError).toBeVisible()
+  await expect(guardError).toBeFocused()
+  expect((await chapter('ch_0002')).current_draft_revision).toBeNull()
+
+  for (const [id, number] of [['ch_0001', 1], ['ch_0002', 2]] as const) {
+    await workspace('Writer')
+    await selectChapter(id)
+    await page.getByRole('button', { name: 'Chạy Writer' }).click()
+    await expect.poll(async () => (await chapter(id)).draft_complete).toBe(true)
+    await expect(page.getByRole('button', { name: 'Chạy Writer' })).toBeEnabled()
+    await workspace('Review')
+    await selectChapter(id)
+    await page.getByRole('button', { name: 'Đánh dấu đã review' }).click()
+    await expect.poll(async () => (await chapter(id)).human_review?.valid_for_current_revision).toBe(true)
+    await workspace('Finalize / Reconcile')
+    await selectChapter(id)
+    await page.getByRole('button', { name: 'Finalize Chapter' }).click()
+    await expect.poll(async () => (await chapter(id)).status).toBe('finalizing')
+    await page.getByRole('button', { name: 'Generate proposal' }).click()
+    await expect(page.getByRole('button', { name: 'Accept & commit state' })).toBeVisible()
+    await page.getByRole('button', { name: 'Accept & commit state' }).click()
+    await expect.poll(async () => (await chapter(id)).status).toBe('final_reconciled')
+    expect((await chapter(id)).chapter_number).toBe(number)
+  }
+
+  const finalBefore = (await chapter('ch_0001')).final_text
+  await workspace('Revision / Recovery')
+  await expect(page.getByText('Chapter versions (2)')).toBeVisible()
+  await page.getByRole('combobox', { name: 'Chương' }).selectOption('ch_0001')
+  const retconConfirm = page.getByRole('checkbox', { name: /Tôi hiểu retcon/ })
+  await retconConfirm.focus()
+  await retconConfirm.press('Space')
+  await expect(retconConfirm).toBeChecked()
+  await page.getByRole('button', { name: 'Start Retcon' }).press('Enter')
+  await expect(page.getByText(/Retcon mở: draft/)).toBeVisible()
+  expect((await chapter('ch_0001')).final_text).toBe(finalBefore)
+  await page.reload()
+  await expect(page.getByText(/Retcon mở: draft/)).toBeVisible()
+  await page.getByRole('textbox', { name: 'Prose working copy' }).fill(finalBefore + '\n\nBản retcon thay chiếc nồi bằng chiếc đèn.')
+  await page.getByRole('button', { name: 'Save draft retcon' }).click()
+  await expect.poll(async () => (await chapter('ch_0001')).current_draft_revision).toBe(3)
+  expect((await chapter('ch_0001')).final_text).toBe(finalBefore)
+  await workspace('Finalize / Reconcile')
+  await selectChapter('ch_0001')
+  await page.getByRole('checkbox', { name: /Tôi đã đọc và xác nhận bản draft retcon/ }).check()
+  await page.getByRole('button', { name: 'Finalize Retcon' }).click()
+  await expect.poll(async () => (await chapter('ch_0001')).status).toBe('finalizing')
+  expect((await chapter('ch_0001')).final_text).toBe(finalBefore)
+  await page.getByRole('button', { name: 'Generate proposal' }).click()
+  await expect(page.getByRole('button', { name: 'Accept & commit state' })).toBeVisible()
+  await page.getByRole('button', { name: 'Accept & commit state' }).click()
+  await expect.poll(async () => (await chapter('ch_0001')).status).toBe('final_reconciled')
+  expect((await chapter('ch_0001')).final_text).toContain('Bản retcon thay chiếc nồi')
+  expect((await chapter('ch_0001')).retcon_open).toBe(false)
+  const secondFinal = (await chapter('ch_0002')).final_text
+  await workspace('Revision / Recovery')
+  await page.getByRole('combobox', { name: 'Chương' }).selectOption('ch_0001')
+  await page.getByRole('checkbox', { name: /Đánh dấu state sau chương 1 stale/ }).check()
+  await page.getByRole('button', { name: 'Reset consistency sau retcon' }).click()
+  await expect(page.getByRole('button', { name: 'Reconcile downstream' }).first()).toBeVisible()
+  await capture('stale')
+  await page.getByRole('button', { name: 'Reconcile downstream' }).first().click()
+  await expect.poll(async () => (await (await request.get(`/api/v1/projects/${projectId}/revision`)).json()).data.blockers.filter((row: { suggested_action: string }) => row.suggested_action === 'reconcile_downstream').length).toBe(0)
+  expect((await chapter('ch_0002')).final_text).toBe(secondFinal)
+
+  await capture('revision')
+})

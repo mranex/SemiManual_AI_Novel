@@ -82,6 +82,7 @@ __all__ = [
     "revise_base_idea",
     "revise_premise",
     "start_retcon",
+    "edit_retcon_draft",
 ]
 
 #: Prompt v1 cho impact report.
@@ -397,7 +398,8 @@ def retcon_state(project: Project, *, chapter_id: str) -> dict[str, Any] | None:
     target = project.root / _retcon_marker_path(project, chapter_id)
     if not target.is_file():
         return None
-    return storage.read_json(target)
+    marker = storage.read_json(target)
+    return marker if isinstance(marker, dict) and marker.get("status") == "open" else None
 
 
 def start_retcon(
@@ -515,6 +517,59 @@ def start_retcon(
             "final_still_canon": True,
             "applied_paths": list(manifest.applied_paths),
         },
+    )
+
+
+def edit_retcon_draft(
+    project: Project, *, chapter_id: str, text: str,
+    operation_id: str | None = None, now: str | None = None,
+) -> ActionResult:
+    """Save a new retcon working revision while the previous final stays canon."""
+    if not isinstance(text, str) or not text.strip():
+        raise GuardError("Draft retcon cần prose không rỗng.", code="invalid_draft")
+    chapter = _chapter_or_fail(project, chapter_id)
+    marker = retcon_state(project, chapter_id=chapter_id)
+    if chapter.status is not ChapterStatus.final_reconciled or marker is None:
+        raise GuardError("Chỉ sửa draft sau Start Retcon và trước Finalize.", code="retcon_not_open")
+    if chapter.current_draft_revision != marker.get("retcon_draft_revision"):
+        raise GuardError("Draft retcon đã đổi; tải lại trước khi Save.", code="stale_candidate")
+    op_id = operation_id or generate_operation_id()
+    replay = _replay_result(project, op_id)
+    if replay is not None:
+        return replay
+    stamp = now or now_iso()
+    new_revision = max((draft.revision for draft in chapter.drafts), default=0) + 1
+    draft_relpath = _relative(project, project.paths.retcon_dir(chapter_id) / f"draft_r{new_revision:04d}.md")
+    current = chapter.current_draft
+    draft = ProseRevision(
+        revision=new_revision, markdown_ref=draft_relpath, source_type=SourceType.user,
+        is_complete=True, created_at=stamp,
+        dependency_pins=list(current.dependency_pins) if current else [],
+    )
+    updated = chapter.model_copy(deep=True)
+    updated.drafts.append(draft)
+    updated.current_draft_revision = new_revision
+    updated.human_review = None
+    # status/final_revision deliberately stay unchanged until reconciliation commits.
+    updated_marker = dict(marker)
+    updated_marker["retcon_draft_revision"] = new_revision
+    updated_marker["retcon_draft_markdown_ref"] = draft_relpath
+    handle = storage.begin_operation(project, operation_type="edit_retcon_draft", operation_id=op_id)
+    if handle.replayed:
+        return _stale_replay(handle.manifest)
+    try:
+        handle.add_text(draft_relpath, text)
+        handle.add_json(_retcon_marker_path(project, chapter_id), updated_marker)
+        handle.add_json(_relative(project, project.paths.chapter_json(chapter_id)), updated)
+        manifest = handle.commit()
+    except Exception:
+        _abort_quietly(handle)
+        raise
+    return ActionResult(
+        operation_id=op_id, chapter_id=chapter_id,
+        message=f"Đã lưu draft retcon r{new_revision}; final cũ vẫn là canon.",
+        data={"retcon_draft_revision": new_revision, "final_still_canon": True,
+              "applied_paths": list(manifest.applied_paths)},
     )
 
 

@@ -33,7 +33,7 @@ Manual_AI_Novel/
 └── projects/
 ```
 
-Runtime prompt loader chỉ dùng manifest/prompt v1 được đăng ký. Prompt cũ trong `docs/prompts/` là reference, không fallback runtime.
+Runtime prompt loader chỉ dùng manifest/prompt v1 được đăng ký; không fallback sang file ngoài manifest.
 
 ## 2. Project layout
 
@@ -314,4 +314,3 @@ Luật storage:
 6. Raw output của lần generate dùng horizon nào vẫn trỏ qua `payload_source.raw_output_ref`;
    không log `planning_scope` như secret (đây không phải secret, nhưng cũng không ghi full
    prompt/context vào log).
-

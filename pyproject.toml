@@ -15,18 +15,21 @@ license = { text = "Proprietary" }
 # lock file/tool ngoài (giữ đơn giản theo spec). Khi cần nâng cấp, sửa pin và
 # chạy lại toàn bộ pytest.
 dependencies = [
-    "streamlit==1.41.1",
     "pydantic==2.11.7",
     "python-dotenv==1.0.1",
+    "fastapi==0.116.1",
+    "uvicorn==0.35.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest==8.3.4",
+    "httpx==0.28.1",
 ]
 
 [project.scripts]
 novel-ai-config = "novel_ai.config:main"
+novel-ai-web = "novel_ai.web.main:main"
 
 [tool.setuptools.packages.find]
 include = ["novel_ai*"]

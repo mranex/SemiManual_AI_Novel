@@ -258,3 +258,24 @@ Hệ quả: T33 dựng event/helper dùng chung + tích hợp Writer; T34/T35 n�
 và chapter; T36 thêm service edit candidate Long/Short Plan; T37–T39 dựng editor theo schema.
 Không thêm queue/worker/concurrent generation.
 
+## D020 — Python application boundary cho hướng WebUI (2026-09-23, A01)
+
+**Nguồn:** định hướng người dùng đã ghi trong `MILESTONE_A_REFACTOR_PLAN.md`. Câu “không FastAPI” trong spec v0.2, `AGENTS.md` phần phạm vi MVP và architecture bản 2026-09-19 mô tả **MVP Streamlit lịch sử**; milestone A chuẩn bị Python core để milestone sau có thể dùng FastAPI + React/TypeScript. A không thêm FastAPI, React hoặc đổi storage/prompt/workflow.
+
+1. Ranh giới đích là `Streamlit adapter → application query/command/event → services/core → JSON/Markdown`; adapter FastAPI sau này dùng cùng Python application contract. `application` không là workflow engine và không tự chạy bước kế tiếp.
+2. Query chỉ đọc; mở project có pending operation trả trạng thái recovery/read-only. Recovery là command explicit. Việc tự recovery khi load nêu trong architecture/storage design ban đầu không phải hành vi của implementation hiện tại và không được thêm vào query trong A.
+3. Command định danh bằng project/artifact/chapter ID, intent, `operation_id` và revision/fingerprint cần thiết. Guard thực thi ở service/core; UI double-click guard không thay thế idempotency, stale revision hoặc transaction check. Replay cùng operation đã commit không merge/call LLM lần nữa.
+4. `GenerationEvent` thuần Python tiếp tục là event contract; `saved` sau validate + persist mới là terminal thành công. Transcript/working editor trong session client; accepted/candidate/raw/partial/history/operation manifest ở disk.
+5. Application DTO/error phải redacted: không API key, header, full Writer author truth/future plot, absolute path nội bộ. Mã lỗi/field issues ổn định; không bắt adapter parse message. Client/prompt registry được chọn bằng app config và dependency injection, không bằng request path/key của browser.
+6. Giữ tương thích file hiện có, kể cả default POV/length vắng mặt và Long Plan legacy thiếu horizon. Không migration trong A. A03/A04 đã chuyển Save default của Short Plan sang command với freshness guard.
+
+Inventory toàn bộ query/action, mapping source → boundary và test ở [application-boundary-a01.md](application-boundary-a01.md). A02–A05 đã thực thi/kiểm contract này theo thứ tự task; kết quả và giới hạn tại [milestone-a-acceptance.md](milestone-a-acceptance.md), handoff tại [milestone-b-handoff.md](milestone-b-handoff.md). Các quyết định HTTP/stream transport/frontend còn mở cho milestone B.
+
+## D021 — Cutover sang WebUI local (2026-09-23, B08)
+
+Sau khi B07 đạt matrix 12 query/54 command và B08 qua full Python/HTTP/frontend/Chrome E2E,
+entrypoint chính là `python -m novel_ai.web.main`; FastAPI phục vụ React build cùng origin trên
+`127.0.0.1:8000`, một worker. Gỡ adapter, dependency và test chỉ thuộc Streamlit. Python
+`application/services/core` và định dạng JSON/Markdown của project không đổi; project legacy mở
+trực tiếp, không migration ngầm. Phạm vi vẫn local một người dùng, không auth/cloud sync.
+Xem [báo cáo B](milestone-b-acceptance.md) và [HTTP contract](web-api-v1.md).
